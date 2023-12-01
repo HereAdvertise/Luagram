@@ -1,17 +1,10 @@
-name: Lua Busted
-description: Busted
-inputs:
-  args:
-    description: Arguments passed to busted
-    required: false
-    default: "."
-runs:
-  using: docker
-  image: docker://ghcr.io/lunarmodules/busted:v2.2.0
-  entrypoint: sh
-  args:
-    - -c
-    - busted ${{ inputs.args }}
-branding:
-  icon: check
-  color: yellow
+name: Busted
+on: [push, pull_request]
+jobs:
+  sile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Run Busted
+        uses: lunarmodules/busted@v0

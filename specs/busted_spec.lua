@@ -1,7 +1,6 @@
 describe('Busted unit testing framework', function()
     describe('Busted test', function()
         it('should be Truthy', function()
-            assert.falsy('Yup.')
             assert.truthy('Yup.')
         end)
     end)

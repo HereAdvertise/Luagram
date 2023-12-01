@@ -1,0 +1,7 @@
+describe('Busted unit testing framework', function()
+    describe('Busted test', function()
+        it('should be Truthy', function()
+            assert.truthy('Yup.')
+        end)
+    end)
+end)

@@ -78,16 +78,18 @@
         localStorage.setItem("lang", "moon_chain");
     }
 
-    if (localStorage.getItem("lang") !== null) {
-        const lang = localStorage.getItem("lang");
-        if (lang === "lua") {
-            lua();
-        } else if (lang === "lua_chain") {
-            lua_chain();
-        } else if (lang === "moon") {
-            moon();
-        } else if (lang === "moon_chain") {
-            moon_chain();
+    window.onload = function() {
+        if (localStorage.getItem("lang") !== null) {
+            const lang = localStorage.getItem("lang");
+            if (lang === "lua") {
+                lua();
+            } else if (lang === "lua_chain") {
+                lua_chain();
+            } else if (lang === "moon") {
+                moon();
+            } else if (lang === "moon_chain") {
+                moon_chain();
+            }
         }
     }
 </script>

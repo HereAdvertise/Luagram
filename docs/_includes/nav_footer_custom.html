@@ -24,6 +24,7 @@
             el.classList.remove("btn-blue");
         }
         document.getElementById("language_lua").classList.add("btn-blue");
+        localStorage.setItem("lang", "lua");
     }
 
     function lua_chain() {
@@ -40,6 +41,7 @@
             el.classList.remove("btn-blue");
         }
         document.getElementById("language_lua_chain").classList.add("btn-blue");
+        localStorage.setItem("lang", "lua_chain");
     }
 
     function moon() {
@@ -56,6 +58,7 @@
             el.classList.remove("btn-blue");
         }
         document.getElementById("language_moon").classList.add("btn-blue");
+        localStorage.setItem("lang", "moon");
     }
 
     function moon_chain() {
@@ -72,5 +75,19 @@
             el.classList.remove("btn-blue");
         }
         document.getElementById("language_moon_chain").classList.add("btn-blue");
+        localStorage.setItem("lang", "moon_chain");
+    }
+
+    if (localStorage.getItem("lang") !== null) {
+        const lang = localStorage.getItem("lang");
+        if (lang === "lua") {
+            lua();
+        } else if (lang === "lua_chain") {
+            lua_chain();
+        } else if (lang === "moon") {
+            moon();
+        } else if (lang === "moon_chain") {}
+            moon_chain();
+        }
     }
 </script>

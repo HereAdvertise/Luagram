@@ -10,30 +10,30 @@ If [Jekyll] is installed on your computer, you can also build and preview the cr
 More specifically, the created site:
 
 
-<div class="language_block language_lua">
+<span class="language_block language_lua">
 
 ```lua
 print "ok"
 ```
-</div>
+</span>
 
-<div class="language_block language_lua_chain" style="display:none;">
+<span class="language_block language_lua_chain" style="display:none;">
 
 
 ```lua
 print "ok"
 ```
-</div>
+</span>
 
-<div class="language_block language_moon" style="display:none;">
+<span class="language_block language_moon" style="display:none;">
 
 ```moonscript
 print "ok"
 ```
 
-</div>
+</span>
 
-<div class="language_block language_moon_chain" style="display:none;">
+<span class="language_block language_moon_chain" style="display:none;">
 
 
 ```moonscript
@@ -41,7 +41,7 @@ print "ok"
 ```
 
 
-</div>
+</span>
 
 
 - uses a gem-based approach, i.e. uses a `Gemfile` and loads the `just-the-docs` gem

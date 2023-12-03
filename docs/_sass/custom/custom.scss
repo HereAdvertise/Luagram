@@ -1,6 +1,6 @@
 .language_selector {
     display: block;
-    padding-bottom: 10px;
+    padding: 5px 5px 10px 5px;
 }
 
 .language_selector > div {
@@ -8,11 +8,11 @@
     gap: 5px;
     flex-direction: row;
     flex-wrap: wrap;
-    padding: 5px;
+    padding-bottom: 5px;
 }
 
 .language_selector > div button {
-    font-size: 12px;
+    font-size: 120px;
     flex-grow: 1;
-    width: 100%;
+    width: 100px;
 }

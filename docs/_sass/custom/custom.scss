@@ -1,0 +1,15 @@
+.language_selector {
+    display: block;
+}
+
+.language_selector > div {
+    display: flex;
+    gap: 5px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 5px;
+}
+
+.language_selector > div button {
+    font-size: 10px;
+}

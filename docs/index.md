@@ -9,71 +9,25 @@ If [Jekyll] is installed on your computer, you can also build and preview the cr
 
 More specifically, the created site:
 
+{: .language .language_lua }
 ```lua
-print "ok3"
+print "Lua"
 ```
-{: .mb-lg-4 }
 
-
-
-
-<p class="language_block language_lua">
+{: .language .language_lua_chain .language_hidden }
 ```lua
-print "ok2"
+print "Lua (chain)"
 ```
-</p>
 
-<p class="language_block language_lua">
-
+{: .language .language_moon .language_hidden }
 ```lua
-print "ok"
+print "Moonscript"
 ```
-</p>
 
-<p class="language_block language_lua_chain" style="display:none;">
-
-
+{: .language .language_moon_chain .language_hidden }
 ```lua
-print "ok"
+print "Moonscript (chain)"
 ```
-</p>
-
-<p class="language_block language_moon" style="display:none;">
-
-```moonscript
-print "ok"
-```
-
-</p>
-
-<p class="language_block language_moon_chain" style="display:none;">
-
-
-```moonscript
-print "ok"
-```
-
-
-</p>
-
-
-
-
-{: .mb-lg-4 }
-```lua
-print "ok4"
-```
-
-
-```lua
-print "ok6"
-```{: .mb-lg-4 }
-
-```lua {: .mb-lg-4 }
-print "ok7"
-```
-
-
 
 - uses a gem-based approach, i.e. uses a `Gemfile` and loads the `just-the-docs` gem
 - uses the [GitHub Pages / Actions workflow] to build and publish the site on GitHub Pages

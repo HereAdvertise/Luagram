@@ -20,3 +20,87 @@
 .hidden {
     display: none;
 }
+
+.tg {
+    max-width: 250px;
+    padding: 15px;
+    background: #f5f6fa;
+    border-radius: 15px;
+    font-size: 14px;
+}
+
+.tg-right {
+    text-align: right;
+    margin-bottom: 5px;
+}
+
+.tg-right > div {
+    display: inline-block;
+    position: relative;
+    background: #e5ffd0;
+    border-radius: .4em;
+    padding: 5px;
+    color: #2fa9ff;
+    max-width: 75%;
+}
+
+.tg-right > div:after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    width: 0;
+    height: 0;
+    border: 12px solid transparent;
+    border-left-color: #e5ffd0;
+    border-right: 0;
+    border-top: 0;
+    margin-top: -6px;
+    margin-right: -12px;
+}
+
+.tg-left {
+    text-align: left;
+    margin-bottom: 5px;
+}
+
+.tg-left > div {
+    max-width: 75%;
+    display: inline-block;
+    position: relative;
+    background: #ffffff;
+    border-radius: .4em;
+    padding: 5px;
+}
+
+.tg-left > div:after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 0;
+    height: 0;
+    border: 12px solid transparent;
+    border-right-color: #ffffff;
+    border-left: 0;
+    border-top: 0;
+    margin-top: -6px;
+    margin-left: -12px;
+}
+
+.tg-btns {
+    max-width: 75%;
+    display: flex;
+    gap: 5px;
+    justify-content: space-around;
+}
+
+.tg-btns > div {
+    padding: 5px;
+    border-radius: 5px;
+    background: #b2bcc5;
+    color: #fff;
+    margin-bottom: 5px;
+    flex-grow: 1;
+    text-align: center;
+}

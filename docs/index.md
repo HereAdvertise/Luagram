@@ -9,6 +9,23 @@ If [Jekyll] is installed on your computer, you can also build and preview the cr
 
 More specifically, the created site:
 
+
+```lua
+print "ok"
+```
+
+```lua chain
+print "ok"
+```
+
+```moonscript
+print "ok"
+```
+
+```moonscript chain
+print "ok"
+```
+
 - uses a gem-based approach, i.e. uses a `Gemfile` and loads the `just-the-docs` gem
 - uses the [GitHub Pages / Actions workflow] to build and publish the site on GitHub Pages
 

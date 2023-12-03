@@ -20,14 +20,16 @@ print "Lua (chain)"
 ```
 
 {: .language .language_moon .language_hidden }
-```lua
+```moonscript
 print "Moonscript"
 ```
 
 {: .language .language_moon_chain .language_hidden }
-```lua
+```moonscript
 print "Moonscript (chain)"
 ```
+
+
 
 - uses a gem-based approach, i.e. uses a `Gemfile` and loads the `just-the-docs` gem
 - uses the [GitHub Pages / Actions workflow] to build and publish the site on GitHub Pages

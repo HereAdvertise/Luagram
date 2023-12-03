@@ -10,28 +10,37 @@ If [Jekyll] is installed on your computer, you can also build and preview the cr
 More specifically, the created site:
 
 
-<div class="language_lua">
+<div class="language_block language_lua">
+
 ```lua
 print "ok"
 ```
 </div>
 
-<div class="language_lua_chain">
+<div class="language_block language_lua_chain" style="display:none;">
+
+
 ```lua
 print "ok"
 ```
 </div>
 
-<div class="language_moon">
+<div class="language_block language_moon" style="display:none;">
+
 ```moonscript
 print "ok"
 ```
+
 </div>
 
-<div class="language_moon_chain">
+<div class="language_block language_moon_chain" style="display:none;">
+
+
 ```moonscript
 print "ok"
 ```
+
+
 </div>
 
 

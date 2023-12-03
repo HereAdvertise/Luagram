@@ -9,6 +9,14 @@ If [Jekyll] is installed on your computer, you can also build and preview the cr
 
 More specifically, the created site:
 
+```lua
+print "ok3"
+```
+{: .mb-lg-4 }
+
+
+
+
 <p class="language_block language_lua">
 ```lua
 print "ok2"
@@ -47,6 +55,24 @@ print "ok"
 
 
 </p>
+
+
+
+
+{: .mb-lg-4 }
+```lua
+print "ok4"
+```
+
+
+```lua
+print "ok6"
+```{: .mb-lg-4 }
+
+```lua {: .mb-lg-4 }
+print "ok7"
+```
+
 
 
 - uses a gem-based approach, i.e. uses a `Gemfile` and loads the `just-the-docs` gem

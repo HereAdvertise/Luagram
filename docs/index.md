@@ -9,22 +9,22 @@ If [Jekyll] is installed on your computer, you can also build and preview the cr
 
 More specifically, the created site:
 
-{: .language .language_lua }
+{: .lang .lua }
 ```lua
 print "Lua"
 ```
 
-{: .language .language_lua_chain .language_hidden }
+{: .lang .lua_chain .hidden }
 ```lua
 print "Lua (chain)"
 ```
 
-{: .language .language_moon .language_hidden }
+{: .lang .moon .hidden }
 ```moonscript
 print "Moonscript"
 ```
 
-{: .language .language_moon_chain .language_hidden }
+{: .lang .moon_chain .hidden }
 ```moonscript
 print "Moonscript (chain)"
 ```

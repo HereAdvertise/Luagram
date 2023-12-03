@@ -1,10 +1,76 @@
 <div class="site-footer language_selector">
     <div>
-        <button type="button" name="language_lua" class="btn btn-blue">Lua</button>
-        <button type="button" name="language_lua_chain" class="btn">Lua (chain)</button>
+        <button type="button" onclick="lua()" id="language_lua" name="language_lua" class="language_btn btn btn-blue">Lua</button>
+        <button type="button" onclick="lua_chain()"  id="language_lua_chain"name="language_lua_chain" class="language_btn btn">Lua (chain)</button>
     </div>
     <div>
-        <button type="button" name="language_moon" class="btn">Moonscript</button>
-        <button type="button" name="language_moon_chain" class="btn">Moonscript (chain)</button> 
+        <button type="button" onclick="moon()"  id="language_moon" name="language_moon" class="language_btn btn">Moonscript</button>
+        <button type="button" onclick="moon_chain()"  id="language_moon_chain" name="language_moon_chain" class="language_btn btn">Moonscript (chain)</button> 
     </div>
 </div>
+
+<script>
+    function lua() {
+        const langs = document.querySelectorAll('.lang');
+        for (const e of langs) {
+            e.classList.add("hidden");
+        }
+        const els = document.querySelectorAll('.lua');
+        for (const el of els) {
+            el.classList.remove("hidden");
+        }
+        const btns = document.querySelectorAll('.language_btn');
+        for (const el of btns) {
+            el.classList.remove("btn-blue");
+        }
+        document.getElementById("language_lua").classList.add("btn-blue");
+    }
+
+    function lua_chain() {
+        const langs = document.querySelectorAll('.lang');
+        for (const e of langs) {
+            e.classList.add("hidden");
+        }
+        const els = document.querySelectorAll('.lua_chain');
+        for (const el of els) {
+            el.classList.remove("hidden");
+        }
+        const btns = document.querySelectorAll('.language_btn');
+        for (const el of btns) {
+            el.classList.remove("btn-blue");
+        }
+        document.getElementById("language_lua_chain").classList.add("btn-blue");
+    }
+
+    function moon() {
+        const langs = document.querySelectorAll('.lang');
+        for (const e of langs) {
+            e.classList.add("hidden");
+        }
+        const els = document.querySelectorAll('.moon');
+        for (const el of els) {
+            el.classList.remove("hidden");
+        }
+        const btns = document.querySelectorAll('.language_btn');
+        for (const el of btns) {
+            el.classList.remove("btn-blue");
+        }
+        document.getElementById("language_moon").classList.add("btn-blue");
+    }
+
+    function moon_chain() {
+        const langs = document.querySelectorAll('.lang');
+        for (const e of langs) {
+            e.classList.add("hidden");
+        }
+        const els = document.querySelectorAll('.moon_chain');
+        for (const el of els) {
+            el.classList.remove("hidden");
+        }
+        const btns = document.querySelectorAll('.language_btn');
+        for (const el of btns) {
+            el.classList.remove("btn-blue");
+        }
+        document.getElementById("language_moon_chain").classList.add("btn-blue");
+    }
+</script>

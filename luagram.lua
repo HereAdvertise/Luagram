@@ -244,7 +244,8 @@ local function message_parse(self, message, ...)
                     uuid = string.format("luagram_action_%s_%s_%s", self._chat_id, id(self), os.time())
                     interactions[#interactions + 1] = uuid
                     local action = {
-                        message = self,
+                        message = message,
+                        chat_id = self._chat_id,
                         index = index,
                         label = label,
                         value = item.action,

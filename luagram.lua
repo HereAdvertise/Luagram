@@ -99,6 +99,10 @@ local function message_parse(self, message, ...)
     local buttons = {}
     local interactions = {}
     local row = {}
+    local data = {}
+
+    local media
+    local title, description, price
 
     local open_tags = {}
     local function close_tags()
@@ -215,6 +219,18 @@ local function message_parse(self, message, ...)
                 close_tags()
                 texts[#texts + 1] = text(self, item.value)
 
+            -- others
+            elseif item._type = "media" then
+                media = item._media
+            elseif item._type = "title" then
+                title = item._title
+            elseif item._type = "description" then
+                description = item._description
+            elseif item._type = "price" then
+                price = item._price
+            elseif item._type = "data" then
+                data[item._key] = data[item._value]
+
             -- buttons
             elseif item._type = "action" then
                 -- criar um action aqui
@@ -246,6 +262,9 @@ local function message_parse(self, message, ...)
                     url = item.location
                 }
             elseif item._type = "transaction" then
+                --se label for igual a false:
+                --colocar esse botão no primeiro item da lista
+                --caso contrario, colocar normal
             elseif item._type = "row" then
                 buttons[#buttons + 1] = row
                 row = {}
@@ -257,6 +276,19 @@ local function message_parse(self, message, ...)
     if #row > 0 then
         buttons[#buttons + 1] = row
     end
+
+    --aqui deve processar de acordo com o tipo da mensagem
+    --se for transaction:
+    --deve checar se há os campos certos
+    --se for media deve informar o field certo de acordo
+    --se a media for um io.open
+    --deve enviar via multipart
+
+    for key, value in pairs(data) do
+        output[key] = value
+    end
+
+    return output
 end
 
 local function send(self, chat_id, language_code, name, ...)

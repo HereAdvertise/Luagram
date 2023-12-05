@@ -97,6 +97,7 @@ local function message_parse(self, message, ...)
     local output = {}
     local texts = {}
     local buttons = {}
+    local interactions = {}
     local row = {}
 
     local open_tags = {}
@@ -219,14 +220,22 @@ local function message_parse(self, message, ...)
                 -- criar um action aqui
                 --gerar uuid
                 --adicionar À sessão
+                local uuid
                 local label = text(self, item.label)
-                local action = {
-                    message = self,
-                    index = index,
-                    label = label,
-                    value = item.value,
-                    args = 1 --> qual args?
-                }
+                if type(item.action) == "string" then
+                    uuid = string.format("luagram_event_%s", item.action)
+                else
+                    uuid = string.format("luagram_action_%s_%s_%s", self._chat_id, id(self), os.time())
+                    interactions[#interactions + 1] = uuid
+                    local action = {
+                        message = self,
+                        index = index,
+                        label = label,
+                        value = item.action,
+                        interactions = interactions,
+                        args = 1 --> qual args?
+                    }
+                end
                 row[#row + 1] = {
                     text = label,
                     callback_data = uuid
@@ -234,7 +243,7 @@ local function message_parse(self, message, ...)
             elseif item._type = "location" then
                 row[#row + 1] = {
                     text = text(self, item.label),
-                    url = item.value
+                    url = item.location
                 }
             elseif item._type = "transaction" then
             elseif item._type = "row" then
@@ -306,20 +315,18 @@ local function send(self, chat_id, language_code, name, ...)
 
         local thread = user.thread
 
+        chat.listen =  function(_, match)
+            if type(match) == "function" then
+                thread.match = match
+            else
+                thread.match = nil
+            end
+            return coroutine.yield()
+        end
+
         thread.main = coroutine.create(object._main)
         thread.object = object
-
-        thread.self = setmetatable({}, {
-            __call = function(_, match)
-                if type(match) == "function" then
-                    thread.match = match
-                else
-                    thread.match = nil
-                end
-                return coroutine.yield()
-            end,
-            __index = chat
-        })
+        thread.self = chat
 
         local ok, err = coroutine.resume(thread.main, thread.self, unlist(select("#", ...) > 0 and list(...) or object._args))
 
@@ -662,13 +669,9 @@ local function callback_query(self, chat_id, language_code, update_data)
 
     local data = update_data.data
 
-    if not data:match("^luagram_action_[%d_]+$") then
+    if not data:match("^luagram_action_%d+_%d+_%d+$") then
         return false
     end
-
-    local answer = {
-        cache_time = 0
-    }
 
     local user = self._users:get(chat_id)
 
@@ -686,11 +689,20 @@ local function callback_query(self, chat_id, language_code, update_data)
         return false
     end
 
+    local answer = {
+        cache_time = 0
+    }
+
     if action.lock then
-        return false
+        --necessário reponder ok aqui
+        answer.callback_query_id = update_data.id
+        self.__class:api("answer_callback_query", answer)
+        return true
     end
 
     action.lock = true
+
+   
 
     -- necessáriorealizar uma copia da mensagem original
     -- essa mensagem é passada a função
@@ -721,7 +733,8 @@ local function callback_query(self, chat_id, language_code, update_data)
     this.this = function(self)
         for index = 1, #self do
             if type(self[index]) == "table" and self[index]._type == "action" and self[index].id == action.id then
-                return index, self
+                self[index].index = index
+                return self[index], self
             end
         end
         return nil, self
@@ -729,11 +742,11 @@ local function callback_query(self, chat_id, language_code, update_data)
 
     this.redaction = function(self, label, action, ...)
         local this = self:this()
-        label = label or self[this].label
-        action = action or self[this].action
-        local args = select("#", ...) > 0 and list(...) or self[this].args
-        self:remove(this)
-        self:action(this, label, action, args)
+        label = label or this.label
+        action = action or this.action
+        local args = select("#", ...) > 0 and list(...) or this.args
+        self:remove(this.index)
+        self:action(this.index, label, action, args)
         return self
     end
 
@@ -767,7 +780,7 @@ local function callback_query(self, chat_id, language_code, update_data)
         return self
     end
 
-    this.url = function(self, url)
+    this.redirect = function(self, url)
         answer.url = url
         return self
     end
@@ -778,6 +791,10 @@ local function callback_query(self, chat_id, language_code, update_data)
     end
 
     local _ = (function(ok, result, ...)
+
+        if not ok then
+            --catch: result
+        end
 
         if result == true then
             this = message_clone._source:clone()
@@ -794,6 +811,20 @@ local function callback_query(self, chat_id, language_code, update_data)
             ]]
             -- redirect to string
             --this = self.__class._objects[result]:clone()
+            local object = self.__class._objects[result]
+            if object then
+                if object._type == "message" then
+                    this = object:clone()
+                elseif  object._type == "session" then
+                    --call session
+                    --pssar os args
+                    return
+                else
+                    -- error: invalid object
+                end
+            else
+                --error: object not found
+            end
         elseif type(result) == "table" then
             this = result
         elseif result == nil then
@@ -808,6 +839,33 @@ local function callback_query(self, chat_id, language_code, update_data)
         -- message_parse.
         -- edit current message
 
+        --necessário fazer um loop em action.interactions
+        --cada key deve remover o action user.actions[...] = nil
+        --caso a mensagem antiga precise for alterada
+        --ou seja, chegue até aqui
+
+        if action.message._transaction then
+            --mensagem antiga é uma transaction
+            --não pode ser alterada
+            --enviar uma nova mensagem aqui
+
+            --verificar se é possível alterar o teclado ainda
+            --acredito que não
+            --nesse caso se a transaction possuir teclado, o que fazer??
+            --inutilizar (action.transactions???)
+            return
+        end
+
+        if action.message._media and not this._media then
+            this._media = action.message._media
+
+        elseif not action.message._media and this._media then
+            --remover os botões da mensagem antiga
+            --enviar uma nova mensagem
+
+            return
+        end
+
     end)(pcall(action.action, message_clone, unlist(action.args))) -- unlist(select("#", ...) > 0 and list(...) or action.args)
 
     action.lock = false
@@ -816,7 +874,7 @@ local function callback_query(self, chat_id, language_code, update_data)
         answer.text = table.concat(answer.text)
     end
     answer.callback_query_id = update_data.id
-    self:api("answer_callback_query", answer)
+    self.__class:api("answer_callback_query", answer)
 
     return true
 end
@@ -901,7 +959,7 @@ function luagram:receive(update)
 
         if valid then
 
-            local ok, err = coroutine.resume(thread.main, result and unlist(result) or update)
+            local ok, err = coroutine.resume(thread.main, unlist(result or list(update)))
 
             if not ok then
                 thread.object:catch(string.format("error on execute main session thread (%s): %s", thread.object._name, err))

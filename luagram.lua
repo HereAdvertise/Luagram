@@ -516,6 +516,11 @@ modules.chat = function(self)
         return self
     end
 
+    chat.api = function(self, method, data)
+        data.chat_id = self._chat_id
+        return self.__class:api(method, data), self
+    end
+
     return self
 end
 
@@ -604,6 +609,7 @@ function luagram.new(options)
 
     self:module("message")
     self:module("session")
+    self:module("chat")
 
     return self
 end
@@ -644,8 +650,16 @@ end
 
 function luagram:locales(locales)
 
-    -- se locales  for usa string, tentar importar igual ao module
-    -- após, preprocessar os names dos objetos em busca de nomes traduzíuveis
+    if type(locales) == "string" then
+        local path = package.path
+        package.path = "./locales/?.lua;" .. path
+        local ok, module = pcall(require, locales)
+        package.path = path
+        if not ok then
+            error("module '" .. locales .. "' not found")
+        end
+        locales = module
+    end
 
     self._locales = locales
     return self
@@ -694,7 +708,6 @@ local function callback_query(self, chat_id, language_code, update_data)
     }
 
     if action.lock then
-        --necessário reponder ok aqui
         answer.callback_query_id = update_data.id
         self.__class:api("answer_callback_query", answer)
         return true
@@ -801,16 +814,6 @@ local function callback_query(self, chat_id, language_code, update_data)
         elseif result == false then
             this:clear("buttons")
         elseif type(result) == "string" then
-            --[[
-            aqui redireciona para alguma message/session
-            lembre-se de que se for message veriifca se pode mesclar
-            se não for possível, deve-se remover os buttons daqui
-            e enviar uma nova mensagem
-
-            sessions sempre abrem uma nova mensagem
-            ]]
-            -- redirect to string
-            --this = self.__class._objects[result]:clone()
             local object = self.__class._objects[result]
             if object then
                 if object._type == "message" then
@@ -825,10 +828,16 @@ local function callback_query(self, chat_id, language_code, update_data)
             else
                 --error: object not found
             end
-        elseif type(result) == "table" then
+        elseif type(result) == "table" and result._type == "session" then
+            --call session
+            --passar os args
+            return
+        elseif type(result) == "table" and result._type == "message" then
             this = result
         elseif result == nil then
             return
+        else
+            --catch error
         end
 
         --com o result, realizar a mensagem_parse aqui
@@ -924,6 +933,10 @@ function luagram:receive(update)
         -- aqui deve -se verificar se o callback_query é o formato do luagram
         -- e responder de acordo
         --continuar para que seja enviado o entry point
+
+        --luagram_event_(name) --> pesquisar por esse event
+        --se houver: chamar e return
+
 
     end
 

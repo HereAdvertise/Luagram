@@ -94,15 +94,33 @@ end
 
 local function message_parse(self, message, ...)
     -- é muito simples parsear uma mensagem
+
+    local users = self.__class._users
+
+    local user = users:get(self._chat_id)
+
+    if not user then
+        message:catch("user not found")
+        return
+    end
+
     local output = {}
     local texts = {}
     local buttons = {}
     local interactions = {}
     local row = {}
-    local data = {}
+    local data = {
+        parse_mode = "HTML"
+    }
 
-    local media
+    local media, media_type, media_extension
     local title, description, price
+
+    local enctype
+    local method
+
+    local transaction = false
+    local transaction_label = false
 
     local open_tags = {}
     local function close_tags()
@@ -243,15 +261,15 @@ local function message_parse(self, message, ...)
                 else
                     uuid = string.format("luagram_action_%s_%s_%s", self._chat_id, id(self), os.time())
                     interactions[#interactions + 1] = uuid
-                    local action = {
+                    local interaction = {
                         message = message,
-                        chat_id = self._chat_id,
                         index = index,
                         label = label,
                         value = item.action,
                         interactions = interactions,
                         args = 1 --> qual args?
                     }
+                    user.interactions[uuid] = interaction
                 end
                 row[#row + 1] = {
                     text = label,
@@ -263,9 +281,39 @@ local function message_parse(self, message, ...)
                     url = item.location
                 }
             elseif item._type = "transaction" then
+                if transaction then
+                    error("transaction previously defined for this message")
+                end
+
+                transaction = true
+
+                local label = text(self, item.label)
+
+                if item.label ~= false then
+                    table.insert(buttons, 1, {
+                        text = label,
+                        pay = true
+                    })
+                else
+                    --não pode haver mais nenhum botão nesse caso
+                    transaction_label = true
+                end
+
+                local uuid = string.format("luagram_transaction_%s_%s_%s", self._chat_id, id(self), os.time())
+
+                local interaction = {
+                    message = message,
+                    index = index,
+                    label = label,
+                    value = item.transaction,
+                    interactions = interactions,
+                    args = 1 --> qual args?
+                }
+
+                user.interactions[uuid] = interaction
                 --se label for igual a false:
                 --colocar esse botão no primeiro item da lista
-                --caso contrario, colocar normal
+
             elseif item._type = "row" then
                 buttons[#buttons + 1] = row
                 row = {}
@@ -277,6 +325,112 @@ local function message_parse(self, message, ...)
     if #row > 0 then
         buttons[#buttons + 1] = row
     end
+
+    if transaction and transaction_label and #buttons > 0 then
+        error("add a label to transaction function to define actions in this message")
+    end
+
+    if media then
+        if string.match(string.lower(media), "^https?://[^%s]+$") then
+            media_type = "url"
+        elseif string.match(media, "[/\\]") then
+            media_type = "path"
+            enctype = "multipart"
+        else
+            media_type = "id"
+        end
+    end
+
+    if transaction and media and media_type == "url" then
+        if not data.photo_url then
+            data.photo_url = media
+            media = nil
+        end
+    elseif transaction and media then
+        error("you can only define an url for transaction media")
+    end
+
+    if transaction then
+        --check title
+        --check description
+        --check price
+    end
+
+    if media_type == "id" then
+        local response, err = self.__class:api("get_file", {
+            file_id = media
+        })
+
+        if not response then
+            error(err)
+        end
+
+        local file_path = string.lower(assert(response.file_path, "file_path not found"))
+
+        if file_path:mach("animations") then
+            method = "animation"
+        elseif file_path:mach("photos") then
+            method = "photo"
+        else
+            error(string.format("unknown file type: %s", file_path))
+        end
+
+    elseif media_type == "url" then
+        local response, status, headers = request(media)
+
+        if not response then
+            error(status)
+        end
+
+        if status ~= 200 then
+            error(string.format("unable to fetch media (%s): %s", media, status))
+        end
+
+        local content_type
+
+        if type(headers) == "table" and headers["content-type"] then
+            content_type = string.lower(headers["content-type"])
+
+            if content_type == "image/gif" then
+                method = "animation"
+            elseif content_type == "image/png" or content_type == "image/jpg" or content_type == "image/jpeg" then
+                method = "photo"
+            else
+                error(string.format("unknown file content type (%s): %s", media, content_type))
+            end
+        else
+            error(string.format("content type not found for media %s", media))
+        end
+
+    elseif media_type == "path" then
+
+        local file, err = io.open(media, "rb")
+
+        if not file then
+            error(err)
+        end
+
+        file:seek("set")
+        if not method and file:read(4) == "\x47\x49\x46\x38" then -- gif
+            method = "animation"
+        end
+        file:seek("set")
+        if not method and file:read(8) == "\x89\x50\x4E\x47\x0D\x0A\x1A\x0A" then -- png
+            method = "photo"
+        end
+        file:seek("set")
+        if not method and file:read(3) == "\xFF\xD8\xFF" then -- jpg, jpeg
+            method = "photo"
+        end
+        file:close()
+        if not method then
+            error(string.format("unknown media signature"))
+        end
+    else
+        error("unknown media type")
+    end
+
+   
 
     --aqui deve processar de acordo com o tipo da mensagem
     --se for transaction:
@@ -302,7 +456,7 @@ local function send(self, chat_id, language_code, name, ...)
 
     if not user then
         users:set(chat_id, {
-            _actions = {}
+            interactions = {}
         })
         user = users:get(chat_id)
     end
@@ -426,9 +580,6 @@ modules.message = function(self)
         self._id = id(self)
         self._args = list(...)
         self._catch = catch_error
-        self._data = {
-            parse_mode = "html"
-        }
         self._name = name
         if name ~= false then
             self.__class._objects[name] = self
@@ -726,7 +877,7 @@ local function callback_query(self, chat_id, language_code, update_data)
         return false
     end
 
-    local action = user.actions[data]
+    local action = user.interactions[data]
 
     if not action then
         return false
@@ -977,7 +1128,7 @@ function luagram:receive(update)
 
     if not user then
         self._users:get(id, {
-            _actions = {}
+            interactions = {}
         })
     end
 

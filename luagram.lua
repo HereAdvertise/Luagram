@@ -116,8 +116,8 @@ local function message_parse(self, message, ...)
     local media, media_type, media_extension
     local title, description, price
 
-    local enctype
-    local method
+    local enctype = "json"
+    local method = "message"
 
     local transaction = false
     local transaction_label = false
@@ -367,9 +367,9 @@ local function message_parse(self, message, ...)
 
         local file_path = string.lower(assert(response.file_path, "file_path not found"))
 
-        if file_path:mach("animations") then
+        if file_path:match("animations") then
             method = "animation"
-        elseif file_path:mach("photos") then
+        elseif file_path:match("photos") then
             method = "photo"
         else
             error(string.format("unknown file type: %s", file_path))

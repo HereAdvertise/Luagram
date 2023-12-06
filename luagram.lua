@@ -644,6 +644,66 @@ modules.message = function(self)
         message[_type] = simple(_type)
     end
 
+    message.run = function(self, ...)
+
+    end
+
+    message.link = function(self, ...)
+
+    end
+
+    message.mention = function(self, ...)
+
+    end
+
+    message.emoji = function(self, ...)
+
+    end
+
+    message.code = function(self, ...)
+
+    end
+
+    message.line = function(self, ...)
+
+    end
+
+    message.media = function(self, ...)
+
+    end
+
+    message.title = function(self, ...)
+
+    end
+
+    message.description = function(self, ...)
+
+    end
+
+    message.price = function(self, ...)
+
+    end
+
+    message.data = function(self, ...)
+
+    end
+
+    message.action = function(self, ...)
+
+    end
+
+    message.location = function(self, ...)
+
+    end
+
+    message.transaction = function(self, ...)
+
+    end
+
+    message.row = function(self, ...)
+
+    end
+
     return self
 end
 

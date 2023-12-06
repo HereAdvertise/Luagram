@@ -1,6 +1,6 @@
 # Luagram
 
-[![license](http://img.shields.io/badge/License-MIT-darkgreen.svg)](LICENSE)
+[![license](http://img.shields.io/badge/license-MIT-darkgreen.svg)](LICENSE)
 [![docs](https://github.com/Propagram/Luagram/actions/workflows/pages.yml/badge.svg)](https://github.com/Propagram/Luagram/actions/workflows/pages.yml)
 [![lint](https://github.com/Propagram/Luagram/actions/workflows/luacheck.yml/badge.svg)](https://github.com/Propagram/Luagram/actions/workflows/luacheck.yml)
 [![spec](https://github.com/Propagram/Luagram/actions/workflows/busted.yml/badge.svg)](https://github.com/Propagram/Luagram/actions/workflows/busted.yml)

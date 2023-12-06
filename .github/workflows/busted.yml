@@ -1,4 +1,4 @@
-name: Busted
+name: spec
 
 on: [ push, pull_request ]
 

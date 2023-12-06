@@ -28,7 +28,7 @@ jobs:
           luarocks install luacov-coveralls
 
       - name: Run regression tests
-        run: busted -c -v
+        run: busted --coverage --lpath="" --cpath="" --output=gtest -Xoutput --color
 
       - name: Report test coverage
         if: success()

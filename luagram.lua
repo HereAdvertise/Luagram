@@ -1,5 +1,5 @@
-local ltn12 = require("ltn12") -- luarocks install luasocket
-local cjson = require("cjson") -- luarocks install lua-cjson
+--local ltn12 = require("ltn12") -- luarocks install luasocket
+--local cjson = require("cjson") -- luarocks install lua-cjson
 
 local unpack = table.unpack or unpack
 
@@ -14,6 +14,84 @@ end
 local function id(self)
     self.__class._ids = self.__class._ids + 1
     return self.__class._ids
+end
+
+local http_provider, json_encoder, json_decoder
+
+local function detect()
+    if http_provider then
+        return
+    end
+    local ok = pcall(_G.GetRedbeanVersion)
+    if ok then
+        http_provider = Fetch
+        json_encoder = EncodeJson
+        json_decoder = DecodeJson
+        return
+    end
+    local ok = pcall(_G.ngx)
+    if ok then
+        local http = require("lapis.nginx.http")
+        http_provider = function(url, options)
+            return http.simple(url, options)
+        end
+        local json = require("cjson")
+        json_encoder = json.encode
+        json_decoder = json.decode
+        return
+    end
+    local http = require("ssl.https")
+    local ltn12 = require("ltn12")
+    http_provider = function(url, options)
+        local out = {}
+        options.source = ltn12.source.string(options.body)
+        options.sink = ltn12.sink.table(out)
+        options.url = url
+        local _, status, headers = http.request(options)
+        local response = table.concat(out)
+        return response, status, headers
+    end
+    local json = require("cjson")
+    json_encoder = json.encode
+    json_decoder = json.decode
+end
+
+detect()
+
+local function request(self, url, options)
+    local http_provider = self.__class._http_provider or http_provider
+    local response, response_status, headers = http_provider(url, options)
+    local response_headers
+    if status == 200 and type(headers) == "table" then
+        response_headers = {}
+        for key, value in pairs(headers) do
+            response_headers[string.lower(key)] = value
+        end
+    end
+    return response, response_status, response_headers or headers
+end
+
+local function telegram(self, method, data)
+    local api = self.__class._api or "https://api.telegram.org/bot%s/%s"
+    api = string.format(api, self.__class._token, method)
+    local body = json_encoder(data)
+    local headers = {
+        ["content-type"] = "application/json",
+        ["content-length"] = #body
+    }
+    if self.__class._headers then
+        for key, value in pairs(self.__class._headers) do
+            headers[string.lower(key)] = value
+        end
+    end
+    local response, response_status, response_headers = request(self, api, {
+        method = "POST",
+        body = body,
+        headers = headers
+    })
+    --check for errors
+    local result = json.decoder(response)
+    return result, response, response_status, response_headers
 end
 
 local function escape(text)
@@ -121,6 +199,7 @@ local function message_parse(self, message, ...)
 
     local transaction = false
     local transaction_label = false
+    local payload
 
     local open_tags = {}
     local function close_tags()
@@ -263,7 +342,6 @@ local function message_parse(self, message, ...)
                     interactions[#interactions + 1] = uuid
                     local interaction = {
                         message = message,
-                        index = index,
                         label = label,
                         value = item.action,
                         interactions = interactions,
@@ -303,12 +381,13 @@ local function message_parse(self, message, ...)
 
                 local interaction = {
                     message = message,
-                    index = index,
                     label = label,
                     value = item.transaction,
                     interactions = interactions,
                     args = 1 --> qual args?
                 }
+
+                payload = uuid
 
                 user.interactions[uuid] = interaction
                 --se label for igual a false:
@@ -354,6 +433,9 @@ local function message_parse(self, message, ...)
         --check title
         --check description
         --check price
+        if not data.payload then
+            data.payload = payload
+        end
     end
 
     if media_type == "id" then

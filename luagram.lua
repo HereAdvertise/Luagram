@@ -29,8 +29,7 @@ local function detect()
         json_decoder = DecodeJson
         return
     end
-    local ok = pcall(_G.ngx)
-    if ok then
+    if _G.ngx then
         local http = require("lapis.nginx.http")
         http_provider = function(url, options)
             return http.simple(url, options)
@@ -194,7 +193,7 @@ local function message_parse(self, message, ...)
     local media, media_type, media_extension
     local title, description, price
 
-    local enctype = "json"
+    local multipart = false
     local method = "message"
 
     local transaction = false
@@ -414,7 +413,7 @@ local function message_parse(self, message, ...)
             media_type = "url"
         elseif string.match(media, "[/\\]") then
             media_type = "path"
-            enctype = "multipart"
+            multipart = true
         else
             media_type = "id"
         end
@@ -512,6 +511,11 @@ local function message_parse(self, message, ...)
         error("unknown media type")
     end
 
+    --lançar um erro aqui se for transactrion e não haver payment_successfully event
+    --se for transaction colocar pra mostrar recibo e mdata
+    --olhar botgram
+
+    message._multipart = multipart
    
 
     --aqui deve processar de acordo com o tipo da mensagem
@@ -1025,10 +1029,6 @@ local function callback_query(self, chat_id, language_code, update_data)
         return false
     end
 
-    if action.chat_id ~= chat_id then
-        return false
-    end
-
     local answer = {
         cache_time = 0
     }
@@ -1214,6 +1214,231 @@ local function callback_query(self, chat_id, language_code, update_data)
     return true
 end
 
+local function shipping_query(self, chat_id, language_code, update_data)
+
+    local payload = update_data.invoice_payload
+
+    if not payload:match("^luagram_transaction_%d+_%d+_%d+$") then
+        return false
+    end
+
+    local user = self._users:get(chat_id)
+
+    if not user then
+        return false
+    end
+
+    local transaction = user.interactions[payload]
+
+    local catch = transaction.message.catch
+
+    if not transaction then
+        return false
+    end
+
+    local this = self:chat(this._chat_id, this._language_code)
+
+    this.status = function(self)
+        return "shipping_query", self
+    end
+
+    this.say = function(self, ...)
+        this:say(...)
+        return self
+    end
+
+    this.send = function(self, ...)
+        this:send(...)
+        return self
+    end
+
+    local _ = (function(ok, ...)
+
+        if not ok then
+            self.__class:api("answer_shipping_query", {
+                shipping_query_id = update_data.id,
+                ok = false,
+                error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
+            })
+            return catch(string.format("error on proccess shipping query: %s", ...))
+        end
+
+        local result = ...
+
+        if type(result) == "string" then
+            self.__class:api("answer_shipping_query", {
+                shipping_query_id = update_data.id,
+                ok = false,
+                error_message = result
+            })
+        elseif result == false then
+            self.__class:api("answer_shipping_query", {
+                shipping_query_id = update_data.id,
+                ok = false,
+                error_message = text(self, {"Sorry, delivery to your desired address is unavailable."})          
+            })
+        elseif select("#", ...) >  0 then
+            local results = {...}
+            local options = {}
+            for index = 1, #results do
+                local current = results[index]
+                if type(current) == "table" and current.id and current.title and current.prices then
+                    options[#options + 1] = {
+                        id = current.id,
+                        title = current.title,
+                        prices = current.prices
+                    }
+                else
+                    self.__class:api("answer_shipping_query", {
+                        shipping_query_id = update_data.id,
+                        ok = false,
+                        error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
+                    })
+                    return catch(string.format("error on proccess shipping query: invalid return value"))
+                end
+            end 
+            self.__class:api("answer_shipping_query", {
+                shipping_query_id = update_data.id,
+                ok = true,
+                shipping_options = options
+            })
+            return true
+        else
+            self.__class:api("answer_shipping_query", {
+                shipping_query_id = update_data.id,
+                ok = false,
+                error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
+            })
+            return catch(string.format("error on proccess shipping query: invalid return value"))
+        end
+
+    end)(pcall(transaction.transaction, this, unlist(action.args))) -- unlist(select("#", ...) > 0 and list(...) or action.args)
+
+end
+
+local function pre_checkout_query(self, chat_id, language_code, update_data)
+
+    local payload = update_data.invoice_payload
+
+    if not payload:match("^luagram_transaction_%d+_%d+_%d+$") then
+        return false
+    end
+
+    local user = self._users:get(chat_id)
+
+    if not user then
+        return false
+    end
+
+    local transaction = user.interactions[payload]
+
+    local catch = transaction.message.catch
+
+    if not transaction then
+        return false
+    end
+
+    local this = self:chat(this._chat_id, this._language_code)
+
+    this.status = function(self)
+        return "pre_checkout_query", self
+    end
+
+    this.say = function(self, ...)
+        this:say(...)
+        return self
+    end
+
+    this.send = function(self, ...)
+        this:send(...)
+        return self
+    end
+
+    local _ = (function(ok, ...)
+
+        if not ok then
+            self.__class:api("answer_pre_checkout_query", {
+                pre_checkout_query_id = update_data.id,
+                ok = false,
+                error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
+            })
+            return catch(string.format("error on proccess pre checkout query: %s", ...))
+        end
+
+        local result = ...
+
+        if type(result) == "string" then
+            self.__class:api("answer_pre_checkout_query", {
+                pre_checkout_query_id = update_data.id,
+                ok = false,
+                error_message = result
+            })
+        elseif result == false then
+            self.__class:api("answer_pre_checkout_query", {
+                pre_checkout_query_id = update_data.id,
+                ok = false,
+                error_message = text(self, {"Sorry, it won't be possible to complete the payment for the item you selected. Please try again in the bot."})          
+            })
+        elseif result == true then
+            self.__class:api("answer_pre_checkout_query", {
+                pre_checkout_query_id = update_data.id,
+                ok = true,
+            })
+            return true
+        else
+            self.__class:api("answer_pre_checkout_query", {
+                pre_checkout_query_id = update_data.id,
+                ok = false,
+                error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
+            })
+            return catch(string.format("error on proccess pre checkout query: invalid return value"))
+        end
+
+    end)(pcall(transaction.transaction, this, unlist(action.args))) -- unlist(select("#", ...) > 0 and list(...) or action.args)
+
+end
+
+local function successful_payment(self, chat_id, language_code, update_data)
+
+    local payload = update_data.successful_payment.invoice_payload
+
+    if not payload:match("^luagram_transaction_%d+_%d+_%d+$") then
+        return false
+    end
+
+    local user = self._users:get(chat_id)
+
+    if not user then
+        return false
+    end
+
+    local transaction = user.interactions[payload]
+
+    if not transaction then
+        return false
+    end
+
+    local this = self:chat(this._chat_id, this._language_code)
+
+    this.status = function(self)
+        return "successful_payment", self
+    end
+
+    this.say = function(self, ...)
+        this:say(...)
+        return self
+    end
+
+    this.send = function(self, ...)
+        this:send(...)
+        return self
+    end
+
+    pcall(transaction.transaction, this, unlist(action.args)) -- unlist(select("#", ...) > 0 and list(...) or action.args)
+
+    return true
+end
+
 local function chat_id(update_data, update_type)
     if update_type == "callback_query" then
         return update_data.message.chat.id, update_data.message.from.language_code
@@ -1263,6 +1488,23 @@ function luagram:receive(update)
         --luagram_event_(name) --> pesquisar por esse event
         --se houver: chamar e return
 
+    elseif update_type == "shipping_query" then
+
+        if shipping_query(self, chat_id, update_data) == true then
+            return
+        end
+
+    elseif update_type == "pre_checkout_query" then
+
+        if pre_checkout_query(self, chat_id, update_data) == true then
+            return
+        end
+
+    elseif update_type == "message" and update_data.successful_payment  then
+
+        if successful_payment(self, chat_id, update_data) == true then
+            return
+        end
 
     end
 

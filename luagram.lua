@@ -104,6 +104,10 @@ local function telegram(self, method, data, multipart)
         local extension = string.lower(assert(string.match(value, "([^%.]+)$"), "no extension"))
         local mimetype = assert(mimetypes[extension], "invalid extension")
         local file = assert(io.open(value, "rb"))
+        if file:seek("end") >= (1024 * 1024 * 50) then
+            error("file is too big")
+        end
+        file:seek("set")
         local data = file:read("*a")
         file:close()
         for key, value in pairs(data) do

@@ -70,14 +70,73 @@ local function request(self, url, options)
     return response, response_status, response_headers or headers
 end
 
-local function telegram(self, method, data)
+local function generate_boundary()
+    local alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    math.randomseed(os.time())
+    local result = {}
+    for index = 1, 64 do
+        local number = math.random(1, #alpha)
+        result[#result + 1] = string.sub(alpha, number, number)
+    end
+    return table.concat(result)
+end
+
+local mimetypes = {
+    png = "image/png",
+    gif = "image/gif",
+    jpeg = "image/jpg",
+    jpg = "image/jpg",
+}
+
+local function telegram(self, method, data, multipart)
+    --multipart é nome da key que é o arquivo multipart
+    --então se haver esse argumento é multipart
+    --sendo multipart, ao passar por essa keu ele encoda como multipart
+    local json_encoder = self.__class._json_encoder or json_encoder
+    local json_decoder = self.__class._json_decoder or json_decoder
     local api = self.__class._api or "https://api.telegram.org/bot%s/%s"
     api = string.format(api, self.__class._token, method)
-    local body = json_encoder(data)
-    local headers = {
-        ["content-type"] = "application/json",
-        ["content-length"] = #body
-    }
+    local headers
+    if multipart then
+        local body = {}
+        local boundary = generate_boundary()
+        local name = assert(string.match(value, "([^/\\]+)$"), "invalid filename")
+        local extension = string.lower(assert(string.match(value, "([^%.]+)$"), "no extension"))
+        local mimetype = assert(mimetypes[extension], "invalid extension")
+        local file = assert(io.open(value, "rb"))
+        local data = file:read("*a")
+        file:close()
+        for key, value in pairs(data) do
+            body[#body + 1] = string.format("--%s\r\n", boundary)
+            body[#body + 1] = string.format("Content-Disposition: form-data; name=%q", key)
+            if key == multipart then
+                body[#body + 1] = string.format("; filename=%q\r\n", name)
+                body[#body + 1] = string.format("Content-Type: %s\r\n", mimetype)
+                body[#body + 1] = "Content-Transfer-Encoding: binary\r\n\r\n"
+                body[#body + 1] = data
+            else
+                body[#body + 1] = "\r\n\r\n"
+                if type(value) == "table" then
+                    body[#body + 1] = json_encoder(value)
+                else
+                    body[#body + 1] = tostring(value)
+                end
+            end
+            body[#body + 1] = "\r\n"
+        end
+        data = nil
+        body = table.concat(body)
+        headers = {
+            ["content-type"] = string.format("multipart/form-data; boundary=%s", boundary),
+            ["content-length"] = #body
+        }
+    else
+        local body = json_encoder(data)
+        headers = {
+            ["content-type"] = "application/json",
+            ["content-length"] = #body
+        }
+    end
     if self.__class._headers then
         for key, value in pairs(self.__class._headers) do
             headers[string.lower(key)] = value
@@ -89,7 +148,7 @@ local function telegram(self, method, data)
         headers = headers
     })
     --check for errors
-    local result = json.decoder(response)
+    local result = json_decoder(response)
     return result, response, response_status, response_headers
 end
 
@@ -171,6 +230,7 @@ end
 
 local function message_parse(self, message, ...)
     -- é muito simples parsear uma mensagem
+    --essa função de sex executada com pcall?
 
     local users = self.__class._users
 
@@ -327,27 +387,30 @@ local function message_parse(self, message, ...)
             elseif item._type = "data" then
                 data[item._key] = data[item._value]
 
-            -- buttons
+            -- interactions
+            elseif item._type = "button" then
+                row[#row + 1] = {
+                    text = text(self, item.label),
+                    callback_data = string.format("luagram_event_%s", item.button)
+                }
             elseif item._type = "action" then
-                -- criar um action aqui
-                --gerar uuid
-                --adicionar À sessão
-                local uuid
-                local label = text(self, item.label)
                 if type(item.action) == "string" then
-                    uuid = string.format("luagram_event_%s", item.action)
-                else
-                    uuid = string.format("luagram_action_%s_%s_%s", self._chat_id, id(self), os.time())
-                    interactions[#interactions + 1] = uuid
-                    local interaction = {
-                        message = message,
-                        label = label,
-                        value = item.action,
-                        interactions = interactions,
-                        args = 1 --> qual args?
-                    }
-                    user.interactions[uuid] = interaction
+                    local action = item.action
+                    item.action = function(_, ...)
+                        return action, ...
+                    end
                 end
+                local label = text(self, item.label)
+                local uuid = string.format("luagram_action_%s_%s_%s", self._chat_id, id(self), os.time())
+                interactions[#interactions + 1] = uuid
+                local interaction = {
+                    message = message,
+                    label = label,
+                    value = item.action,
+                    interactions = interactions,
+                    args = 1 --> qual args?
+                }
+                user.interactions[uuid] = interaction
                 row[#row + 1] = {
                     text = label,
                     callback_data = uuid
@@ -485,37 +548,27 @@ local function message_parse(self, message, ...)
 
     elseif media_type == "path" then
 
-        local file, err = io.open(media, "rb")
+        local extension = string.lower(assert(string.match(media, "([^%.]+)$"), "no extension"))
 
-        if not file then
-            error(err)
-        end
-
-        file:seek("set")
-        if not method and file:read(4) == "\x47\x49\x46\x38" then -- gif
+        if extension == "gif" then
             method = "animation"
-        end
-        file:seek("set")
-        if not method and file:read(8) == "\x89\x50\x4E\x47\x0D\x0A\x1A\x0A" then -- png
+        elseif extension == "png" or extension == "jpg" or extension == "jpeg" then
             method = "photo"
+        else
+            error(string.format("unknown media type: %s", media))
         end
-        file:seek("set")
-        if not method and file:read(3) == "\xFF\xD8\xFF" then -- jpg, jpeg
-            method = "photo"
-        end
-        file:close()
-        if not method then
-            error(string.format("unknown media signature"))
-        end
+
     else
-        error("unknown media type")
+        error(string.format("unknown media type: %s", tostring(media)))
     end
 
     --lançar um erro aqui se for transactrion e não haver payment_successfully event
     --se for transaction colocar pra mostrar recibo e mdata
     --olhar botgram
 
-    message._multipart = multipart
+    --dependendo do método da mensagem e havendo multipart 
+    --colocar o nome do field aqui
+    message._multipart = "arrumar"
    
 
     --aqui deve processar de acordo com o tipo da mensagem
@@ -774,8 +827,13 @@ modules.message = function(self)
 
     end
 
-    message.action = function(self, ...)
+    message.button = function(self, ...)
+        --ver o segundo argumento se não é muito grande (até 15?)
+        --será a action que irá ser procurada
+    end
 
+    message.action = function(self, ...)
+        
     end
 
     message.location = function(self, ...)
@@ -783,7 +841,7 @@ modules.message = function(self)
     end
 
     message.transaction = function(self, ...)
-
+        --pode não conter label
     end
 
     message.row = function(self, ...)

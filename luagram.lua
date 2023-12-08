@@ -1170,9 +1170,12 @@ local function callback_query(self, chat_id, language_code, update_data)
         return self
     end
 
-    this.notify = function(self, value)
+    this.notify = function(self, value, alert)
         if not answer.text then
             answer.text = {}
+        end
+        if alert then
+            answer.show_alert = true
         end
         answer.text[#answer.text + 1] = text(self, value)
         return self
@@ -1180,11 +1183,6 @@ local function callback_query(self, chat_id, language_code, update_data)
 
     this.redirect = function(self, url)
         answer.url = url
-        return self
-    end
-
-    this.alert = function(self)
-        answer.show_alert = true
         return self
     end
 

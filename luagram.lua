@@ -29,10 +29,10 @@ local function detect()
         json_decoder = DecodeJson
         return
     end
-    if _G.ngx then
-        local http = require("lapis.nginx.http")
+    local ok, ngx_http = pcall(require, "lapis.nginx.http")
+    if _G.ngx and ok then
         http_provider = function(url, options)
-            return http.simple(url, options)
+            return ngx_http.simple(url, options)
         end
         local json = require("cjson")
         json_encoder = json.encode
@@ -998,6 +998,7 @@ function luagram.new(options)
     self._users = lru.new(self.options.cache or 1024)
     self._actions = {}
     self._catch = catch_error
+    self.__class = self
 
     self:module("message")
     self:module("session")
@@ -1010,18 +1011,14 @@ function luagram:class(name, new)
     local class = {}
     class.__index = class
     self[name] = setmetatable({}, {
-    __call = function(_, base, ...)
-        local self = setmetatable({}, class)
-        self.__name = name
-        self.__class = base
-        return (new and new(self, ...)) or self
-    end,
-    __index = function(_, key)
-        return class[key]
-    end,
-    __newindex = function(_, key, value)
-        class[key] = value
-    end
+        __call = function(_, base, ...)
+            local self = setmetatable({}, class)
+            self.__name = name
+            self.__class = base
+            return (new and new(self, ...)) or self
+        end,
+        __index = class, -- function(_, key) return class[key] end,
+        __newindex = class -- function(_, key, value) class[key] = value end
     })
     return self
 end

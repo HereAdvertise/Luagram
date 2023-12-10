@@ -918,6 +918,10 @@ modules.chat = function(self)
         return self
     end
 
+    chat.text = function(self, text)
+        return text(self, text)
+    end
+
     return self
 end
 

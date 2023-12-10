@@ -95,7 +95,7 @@ local function telegram(self, method, data, multipart)
     local json_encoder = self.__class._json_encoder or json_encoder
     local json_decoder = self.__class._json_decoder or json_decoder
     local api = self.__class._api or "https://api.telegram.org/bot%s/%s"
-    api = string.format(api, self.__class._token, method)
+    api = string.format(api, self.__class._token, string.gsub(method, "%W", ""))
     local headers
     if multipart then
         local body = {}
@@ -505,7 +505,7 @@ local function message_parse(self, message, ...)
     end
 
     if media_type == "id" then
-        local response, err = self.__class:api("get_file", {
+        local response, err = self.__class:get_file({
             file_id = media
         })
 
@@ -891,6 +891,16 @@ modules.chat = function(self)
         self._type = "chat"
         self._chat_id = chat_id
         self._language_code = language_code
+    end, function(self, key)
+        local value = rawget(getmetatable(self), key)
+        if value == nil then
+            if not string.match(key, "^on_%w+$") then
+                return function(self, data, multipart)
+                    return telegram(self, key, data, multipart)
+                end
+            end
+        end
+        return value
     end)
 
     local chat = self.chat
@@ -901,16 +911,11 @@ modules.chat = function(self)
     end
 
     chat.say = function(self, value)
-        self.__class:api("send_message", {
+        self.__class:send_message({
             chat_id = self._chat_id,
             value = text(self, value)
         })
         return self
-    end
-
-    chat.api = function(self, method, data)
-        data.chat_id = self._chat_id
-        return self.__class:api(method, data), self
     end
 
     return self
@@ -978,7 +983,6 @@ function lru:get(key)
 end
 
 local luagram = {}
-luagram.__index = luagram
 
 function luagram.new(options)
     local self = setmetatable({}, luagram)
@@ -1007,9 +1011,9 @@ function luagram.new(options)
     return self
 end
 
-function luagram:class(name, new)
+function luagram:class(name, new, index)
     local class = {}
-    class.__index = class
+    class.__index = index or class
     self[name] = setmetatable({}, {
         __call = function(_, base, ...)
             local self = setmetatable({}, class)
@@ -1021,6 +1025,23 @@ function luagram:class(name, new)
         __newindex = class -- function(_, key, value) class[key] = value end
     })
     return self
+end
+
+function luagram:__index(key)
+    local value = rawget(luagram, key)
+    if value == nil then
+        local event = string.match(key, "^on_(%w+)$")
+        if event then
+            return function(self, callback)
+                self._events[event] = callback
+                return self
+            end
+        end
+        return function(self, data, multipart)
+            return telegram(self, key, data, multipart)
+        end
+    end
+    return value
 end
 
 function luagram:module(name, ...)
@@ -1054,17 +1075,8 @@ function luagram:locales(locales)
     return self
 end
 
-function luagram:api(method, data)
-
-    return self
-end
-
-function luagram:on(event, callback)
-    if type(event) == "function" then
-        callback = event
-        event = true
-    end
-    self._events[event] = callback
+function luagram:on(callback)
+    self._events[true] = callback
     return self
 end
 
@@ -1094,7 +1106,7 @@ local function callback_query(self, chat_id, language_code, update_data)
 
     if action.lock then
         answer.callback_query_id = update_data.id
-        self.__class:api("answer_callback_query", answer)
+        self.__class:answer_callback_query(answer)
         return true
     end
 
@@ -1266,7 +1278,7 @@ local function callback_query(self, chat_id, language_code, update_data)
         answer.text = table.concat(answer.text)
     end
     answer.callback_query_id = update_data.id
-    self.__class:api("answer_callback_query", answer)
+    self.__class:answer_callback_query(answer)
 
     return true
 end
@@ -1312,7 +1324,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
     local _ = (function(ok, ...)
 
         if not ok then
-            self.__class:api("answer_shipping_query", {
+            self.__class:answer_shipping_query({
                 shipping_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
@@ -1323,13 +1335,13 @@ local function shipping_query(self, chat_id, language_code, update_data)
         local result = ...
 
         if type(result) == "string" then
-            self.__class:api("answer_shipping_query", {
+            self.__class:answer_shipping_query({
                 shipping_query_id = update_data.id,
                 ok = false,
                 error_message = result
             })
         elseif result == false then
-            self.__class:api("answer_shipping_query", {
+            self.__class:answer_shipping_query({
                 shipping_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, {"Sorry, delivery to your desired address is unavailable."})          
@@ -1346,7 +1358,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
                         prices = current.prices
                     }
                 else
-                    self.__class:api("answer_shipping_query", {
+                    self.__class:answer_shipping_query({
                         shipping_query_id = update_data.id,
                         ok = false,
                         error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
@@ -1354,14 +1366,14 @@ local function shipping_query(self, chat_id, language_code, update_data)
                     return catch(string.format("error on proccess shipping query: invalid return value"))
                 end
             end 
-            self.__class:api("answer_shipping_query", {
+            self.__class:answer_shipping_query({
                 shipping_query_id = update_data.id,
                 ok = true,
                 shipping_options = options
             })
             return true
         else
-            self.__class:api("answer_shipping_query", {
+            self.__class:answer_shipping_query({
                 shipping_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
@@ -1414,7 +1426,7 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
     local _ = (function(ok, ...)
 
         if not ok then
-            self.__class:api("answer_pre_checkout_query", {
+            self.__class:answer_pre_checkout_query({
                 pre_checkout_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
@@ -1425,25 +1437,25 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
         local result = ...
 
         if type(result) == "string" then
-            self.__class:api("answer_pre_checkout_query", {
+            self.__class:answer_pre_checkout_query({
                 pre_checkout_query_id = update_data.id,
                 ok = false,
                 error_message = result
             })
         elseif result == false then
-            self.__class:api("answer_pre_checkout_query", {
+            self.__class:answer_pre_checkout_query({
                 pre_checkout_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, {"Sorry, it won't be possible to complete the payment for the item you selected. Please try again in the bot."})          
             })
         elseif result == true then
-            self.__class:api("answer_pre_checkout_query", {
+            self.__class:answer_pre_checkout_query({
                 pre_checkout_query_id = update_data.id,
                 ok = true,
             })
             return true
         else
-            self.__class:api("answer_pre_checkout_query", {
+            self.__class:answer_pre_checkout_query({
                 pre_checkout_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})

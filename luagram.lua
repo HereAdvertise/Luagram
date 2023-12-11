@@ -1058,6 +1058,9 @@ modules.chat = function(self)
         if value == nil then
             if not string.match(key, "^on_%w+$") then
                 return function(self, data, multipart)
+                    if type(data) == "table" and data.chat_id == nil then
+                        data.chat_id = self._chat_id
+                    end
                     return telegram(self, key, data, multipart)
                 end
             end

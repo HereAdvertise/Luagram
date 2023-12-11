@@ -760,18 +760,38 @@ modules.message = function(self)
         end
     end
 
-    local function simple(_type)
+    local function simple(_type, arg1)
         return function(self, ...)
-            local index, value = ...
+            local index, value1 = ...
             local _index = self._index
             if type(index) == "number" and select("#", ...) > 1 then
                 self._index = index
             else
-                value = index
+                value1 = index
             end
             insert(self, {
                 _type = _type,
-                value = value
+                [arg1] = value1
+            })
+            self._index = _index
+            return self
+        end
+    end
+
+    local function multiple(_type, arg1, arg2)
+        return function(self, ...)
+            local index, value1, value2 = ...
+            local _index = self._index
+            if type(index) == "number" and select("#", ...) > 1 then
+                self._index = index
+            else
+                value2 = value1
+                value1 = index
+            end
+            insert(self, {
+                _type = _type,
+                [arg1] = value1,
+                [arg2] = value2
             })
             self._index = _index
             return self
@@ -784,72 +804,154 @@ modules.message = function(self)
 
     for index = 1, #items do
         local _type = items[index]
-        message[_type] = simple(_type)
+        message[_type] = simple(_type, "value")
     end
 
-    message.run = function(self, ...)
+    message.run = simple("run", "run")
 
-    end
+    message.link = multiple("link", "label", "url")
 
-    message.link = function(self, ...)
+    message.mention = multiple("mention", "user", "id")
 
-    end
-
-    message.mention = function(self, ...)
-
-    end
-
-    message.emoji = function(self, ...)
-
-    end
+    message.emoji = multiple("emoji", "emoji", "placeholder")
 
     message.code = function(self, ...)
-
+        local index, language, code = ...
+        local _index = self._index
+        if type(index) == "number" and select("#", ...) > 1 then
+            self._index = index
+        else
+            code = language
+            language = index
+        end
+        if code == nil then
+            code = language
+        end
+        insert(self, {
+            _type = "code",
+            code = code,
+            language = language,
+        })
+        self._index = _index
+        return self
     end
 
     message.line = function(self, ...)
-
+        local index, line = ...
+        local _index = self._index
+        if type(index) == "number" then
+            self._index = index
+        else
+            line = index
+        end
+        insert(self, {
+            _type = "line",
+            line = line
+        })
+        self._index = _index
+        return self
     end
 
-    message.media = function(self, ...)
+    message.media = simple("media", "media")
 
-    end
+    message.title = simple("title", "value")
 
-    message.title = function(self, ...)
+    message.description = simple("description", "value")
 
-    end
+    message.price = multiple("price", "label", "amount")
 
-    message.description = function(self, ...)
-
-    end
-
-    message.price = function(self, ...)
-
-    end
-
-    message.data = function(self, ...)
-
-    end
+    message.data = multiple("data", "key", "value")
 
     message.button = function(self, ...)
-        --ver o segundo argumento se não é muito grande (até 15?)
-        --será a action que irá ser procurada
+        local index, label, event = ...
+        local _index = self._index
+        if type(index) == "number" and select("#", ...) > 1 then
+            self._index = index
+        else
+            event = label
+            label = index
+        end
+        if #event > 15 or string.match(event, "%W") then
+            error(string.format("invalid event name: %s", event))
+        end
+        insert(self, {
+            _type = "button",
+            label = label,
+            event = event
+        })
+        self._index = _index
+        return self
     end
 
     message.action = function(self, ...)
-        
+        local index, label, action = ...
+        local _index = self._index
+        if type(index) == "number" and select("#", ...) > 1 then
+            self._index = index
+        else
+            action = label
+            label = index
+        end
+        insert(self, {
+            _type = "action",
+            label = label,
+            action = action
+        })
+        self._index = _index
+        return self
     end
 
     message.location = function(self, ...)
-
+        local index, label, location = ...
+        local _index = self._index
+        if type(index) == "number" and select("#", ...) > 1 then
+            self._index = index
+        else
+            location = label
+            label = index
+        end
+        insert(self, {
+            _type = "location",
+            label = label,
+            location = location
+        })
+        self._index = _index
+        return self
     end
 
     message.transaction = function(self, ...)
-        --pode não conter label
+        local index, label, transaction = ...
+        local _index = self._index
+        if type(index) == "number" and select("#", ...) > 1 then
+            self._index = index
+        else
+            transaction = label
+            label = index
+        end
+        if type(label) == "function" then
+            transaction = label
+            label = false
+        end
+        insert(self, {
+            _type = "transaction",
+            label = label,
+            transaction = transaction
+        })
+        self._index = _index
+        return self
     end
 
     message.row = function(self, ...)
-
+        local index = ...
+        local _index = self._index
+        if type(index) == "number" then
+            self._index = index
+        end
+        insert(self, {
+            _type = "row"
+        })
+        self._index = _index
+        return self
     end
 
     return self

@@ -387,7 +387,10 @@ local function message_parse(self, message, ...)
             elseif item._type == "description" then
                 description = item._description
             elseif item._type == "price" then
-                price = item._price
+                price = {
+                    label = item.label,
+                    amount = item.amount
+                }
             elseif item._type == "data" then
                 data[item._key] = data[item._value]
 
@@ -572,8 +575,46 @@ local function message_parse(self, message, ...)
 
     --dependendo do método da mensagem e havendo multipart 
     --colocar o nome do field aqui
-    message._multipart = "arrumar"
-   
+
+    if transaction then
+        if media then
+            output.photo_url = media
+        end
+        output.title = title
+        output.description = description
+        output.payload = payload
+        output.start_parameter = payload
+        output.protect_content = true
+        output.currency = self._class._currency
+        output.provider_token = self._class._provider_token
+        output.prices = {price}
+    else
+
+        if method == "animation" then
+            if media then
+                output.animation = media
+                message._multipart = "animation"
+            end
+            output.caption = table.concat(texts)
+        elseif method == "photo" then
+            if media then
+                output.photo = media
+                message._multipart = "photo"
+            end
+            output.caption = table.concat(texts)
+        else
+            output.text = table.concat(texts)
+        end
+
+    end
+
+    output.chat_id = self._chat_id
+    if #buttons > 0 then
+        output.reply_markup = {
+            inline_keyboard	= buttons
+        }
+    end
+
 
     --aqui deve processar de acordo com o tipo da mensagem
     --se for transaction:
@@ -586,7 +627,10 @@ local function message_parse(self, message, ...)
         output[key] = value
     end
 
-    return output
+    message._method = method
+    message._output = output
+
+    return message
 end
 
 local function send(self, chat_id, language_code, name, ...)
@@ -629,7 +673,23 @@ local function send(self, chat_id, language_code, name, ...)
 
         local result = message_parse(chat, this, ...)
 
-        --send
+        if result then
+
+            if result._method == "animation" then
+                self.__class:send_animation(result._output)
+            elseif result._method == "photo" then
+                self.__class:send_photo(result._output)
+            elseif result._method == "message" then
+                self.__class:send_message(result._output)
+            elseif result._method == "invoice" then
+                self.__class:send_invoice(result._output)
+            else
+                error("invalid method")
+            end
+
+        else
+            error("parser error")
+        end
 
     elseif object._type == "session" then
 

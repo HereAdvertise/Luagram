@@ -108,7 +108,7 @@ local function telegram(self, method, data, multipart)
             error("file is too big")
         end
         file:seek("set")
-        local data = file:read("*a")
+        local content = file:read("*a")
         file:close()
         for key, value in pairs(data) do
             body[#body + 1] = string.format("--%s\r\n", boundary)
@@ -117,7 +117,7 @@ local function telegram(self, method, data, multipart)
                 body[#body + 1] = string.format("; filename=%q\r\n", name)
                 body[#body + 1] = string.format("Content-Type: %s\r\n", mimetype)
                 body[#body + 1] = "Content-Transfer-Encoding: binary\r\n\r\n"
-                body[#body + 1] = data
+                body[#body + 1] = content
             else
                 body[#body + 1] = "\r\n\r\n"
                 if type(value) == "table" then
@@ -128,7 +128,7 @@ local function telegram(self, method, data, multipart)
             end
             body[#body + 1] = "\r\n"
         end
-        data = nil
+        content = nil
         body = table.concat(body)
         headers = {
             ["content-type"] = string.format("multipart/form-data; boundary=%s", boundary),
@@ -478,7 +478,7 @@ local function message_parse(self, message, ...)
     if media then
         if string.match(string.lower(media), "^https?://[^%s]+$") then
             media_type = "url"
-        elseif string.match(media, "[/\\]") then
+        elseif string.match(media, "%.") then
             media_type = "path"
             multipart = true
         else

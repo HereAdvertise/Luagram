@@ -61,7 +61,7 @@ local function request(self, url, options)
     local http_provider = self.__class._http_provider or http_provider
     local response, response_status, headers = http_provider(url, options)
     local response_headers
-    if status == 200 and type(headers) == "table" then
+    if response_status == 200 and type(headers) == "table" then
         response_headers = {}
         for key, value in pairs(headers) do
             response_headers[string.lower(key)] = value
@@ -96,14 +96,14 @@ local function telegram(self, method, data, multipart)
     local json_decoder = self.__class._json_decoder or json_decoder
     local api = self.__class._api or "https://api.telegram.org/bot%s/%s"
     api = string.format(api, self.__class._token, string.gsub(method, "%W", ""))
-    local headers
+    local headers, body
     if multipart then
-        local body = {}
+        body = {}
         local boundary = generate_boundary()
-        local name = assert(string.match(value, "([^/\\]+)$"), "invalid filename")
-        local extension = string.lower(assert(string.match(value, "([^%.]+)$"), "no extension"))
+        local name = assert(string.match(data[multipart], "([^/\\]+)$"), "invalid filename")
+        local extension = string.lower(assert(string.match(name, "([^%.]+)$"), "no extension"))
         local mimetype = assert(mimetypes[extension], "invalid extension")
-        local file = assert(io.open(value, "rb"))
+        local file = assert(io.open(data[multipart], "rb"))
         if file:seek("end") >= (1024 * 1024 * 50) then
             error("file is too big")
         end
@@ -135,7 +135,7 @@ local function telegram(self, method, data, multipart)
             ["content-length"] = #body
         }
     else
-        local body = json_encoder(data)
+        body = json_encoder(data)
         headers = {
             ["content-type"] = "application/json",
             ["content-length"] = #body
@@ -278,7 +278,7 @@ local function message_parse(self, message, ...)
         if type(item) == "table" and item._type then
 
             -- runtime
-            if item._type = "run" then
+            if item._type == "run" then
                 message._index = index + 1
                 local _ = (function(ok, ...)
                     if not ok then
@@ -288,76 +288,76 @@ local function message_parse(self, message, ...)
                 message._index = nil
 
             -- texts
-            elseif item._type = "text" then
+            elseif item._type == "text" then
                 texts[#texts + 1] = escape(text(self, item.valu))
                 close_tags()
-            elseif item._type = "bold" then
+            elseif item._type == "bold" then
                 open_tags[#open_tags + 1] = "</b>"
                 texts[#texts + 1] = "<b>"
                 if item.value then
                     texts[#texts + 1] = escape(text(self, item.value))
                     close_tags()
                 end
-            elseif item._type = "italic" then
+            elseif item._type == "italic" then
                 open_tags[#open_tags + 1] = "</i>"
                 texts[#texts + 1] = "<i>"
                 if item.value then
                     texts[#texts + 1] = escape(text(self, item.value))
                     close_tags()
                 end
-            elseif item._type = "underline" then
+            elseif item._type == "underline" then
                 open_tags[#open_tags + 1] = "</u>"
                 texts[#texts + 1] = "<u>"
                 if item.value then
                     texts[#texts + 1] = escape(text(self, item.value))
                     close_tags()
                 end
-            elseif item._type = "spoiler" then
+            elseif item._type == "spoiler" then
                 open_tags[#open_tags + 1] = "</tg-spoiler>"
                 texts[#texts + 1] = "<tg-spoiler>"
                 if item.value then
                     texts[#texts + 1] = escape(text(self, item.value))
                     close_tags()
                 end
-            elseif item._type = "strike" then
+            elseif item._type == "strike" then
                 open_tags[#open_tags + 1] = "</s>"
                 texts[#texts + 1] = "<s>"
                 if item.value then
                     texts[#texts + 1] = escape(text(self, item.value))
                     close_tags()
                 end
-            elseif item._type = "link" then
+            elseif item._type == "link" then
                 close_tags()
                 texts[#texts + 1] = '<a href="'
                 texts[#texts + 1] = escape(item.href)
                 texts[#texts + 1] = '">'
                 texts[#texts + 1] = escape(text(self, item.value))
                 texts[#texts + 1] = "</a>"
-            elseif item._type = "mention" then
+            elseif item._type == "mention" then
                 close_tags()
                 texts[#texts + 1] = '<a href="tg://user?id='
                 texts[#texts + 1] = escape(item.user)
                 texts[#texts + 1] = '">'
                 texts[#texts + 1] = escape(text(self, item.value))
                 texts[#texts + 1] = "</a>"
-            elseif item._type = "emoji" then
+            elseif item._type == "emoji" then
                 close_tags()
                 texts[#texts + 1] = '<tg-emoji emoji-id="'
                 texts[#texts + 1] = escape(item.value)
                 texts[#texts + 1] = '">'
                 texts[#texts + 1] = escape(text(self, item.emoji))
                 texts[#texts + 1] = "</tg-emoji>"
-            elseif item._type = "mono" then
+            elseif item._type == "mono" then
                 close_tags()
                 texts[#texts + 1] = "<code>"
                 texts[#texts + 1] = escape(text(self, item.value))
                 texts[#texts + 1] = "</code>"
-            elseif item._type = "pre" then
+            elseif item._type == "pre" then
                 close_tags()
                 texts[#texts + 1] = "<pre>"
                 texts[#texts + 1] = escape(text(self, item.value))
                 texts[#texts + 1] = "</pre>"
-            elseif item._type = "code" then
+            elseif item._type == "code" then
                 close_tags()
                 if item.language then
                     texts[#texts + 1] = '<pre><code class="language-'
@@ -369,35 +369,35 @@ local function message_parse(self, message, ...)
                     texts[#texts + 1] = escape(text(self, item.value))
                 end
                 texts[#texts + 1] = "</code></pre>"
-            elseif item._type = "line" then
+            elseif item._type == "line" then
                 if item.value then
                     texts[#texts + 1] = escape(text(self, item.value))
                 end
                 close_tags()
                 texts[#texts + 1] = "\n"
-            elseif item._type = "html" then
+            elseif item._type == "html" then
                 close_tags()
                 texts[#texts + 1] = text(self, item.value)
 
             -- others
-            elseif item._type = "media" then
+            elseif item._type == "media" then
                 media = item._media
-            elseif item._type = "title" then
+            elseif item._type == "title" then
                 title = item._title
-            elseif item._type = "description" then
+            elseif item._type == "description" then
                 description = item._description
-            elseif item._type = "price" then
+            elseif item._type == "price" then
                 price = item._price
-            elseif item._type = "data" then
+            elseif item._type == "data" then
                 data[item._key] = data[item._value]
 
             -- interactions
-            elseif item._type = "button" then
+            elseif item._type == "button" then
                 row[#row + 1] = {
                     text = text(self, item.label),
                     callback_data = string.format("luagram_event_%s", item.button)
                 }
-            elseif item._type = "action" then
+            elseif item._type == "action" then
                 if type(item.action) == "string" then
                     local action = item.action
                     item.action = function(_, ...)
@@ -419,12 +419,12 @@ local function message_parse(self, message, ...)
                     text = label,
                     callback_data = uuid
                 }
-            elseif item._type = "location" then
+            elseif item._type == "location" then
                 row[#row + 1] = {
                     text = text(self, item.label),
                     url = item.location
                 }
-            elseif item._type = "transaction" then
+            elseif item._type == "transaction" then
                 if transaction then
                     error("transaction previously defined for this message")
                 end
@@ -459,7 +459,7 @@ local function message_parse(self, message, ...)
                 --se label for igual a false:
                 --colocar esse botão no primeiro item da lista
 
-            elseif item._type = "row" then
+            elseif item._type == "row" then
                 buttons[#buttons + 1] = row
                 row = {}
             end
@@ -1234,7 +1234,7 @@ local function callback_query(self, chat_id, language_code, update_data)
     this._language_code = language_code
     this._chat_id = chat_id
 
-    local chat = self:chat(this._chat_id, this._language_code)
+    local chat = self:chat(chat_id, language_code)
 
     this.say = function(self, ...)
         chat:say(...)
@@ -1311,7 +1311,7 @@ local function callback_query(self, chat_id, language_code, update_data)
         end
 
         if result == true then
-            this = message_clone._source:clone()
+            this = action.message._source:clone()
         elseif result == false then
             this:clear("buttons")
         elseif type(result) == "string" then
@@ -1376,7 +1376,7 @@ local function callback_query(self, chat_id, language_code, update_data)
             return
         end
 
-    end)(pcall(action.action, message_clone, unlist(action.args))) -- unlist(select("#", ...) > 0 and list(...) or action.args)
+    end)(pcall(action.action, this, unlist(action.args))) -- unlist(select("#", ...) > 0 and list(...) or action.args)
 
     action.lock = false
 
@@ -1411,7 +1411,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
         return false
     end
 
-    local this = self:chat(this._chat_id, this._language_code)
+    local this = self:chat(chat_id, language_code)
 
     this.status = function(self)
         return "shipping_query", self
@@ -1513,7 +1513,7 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
         return false
     end
 
-    local this = self:chat(this._chat_id, this._language_code)
+    local this = self:chat(chat_id, language_code)
 
     this.status = function(self)
         return "pre_checkout_query", self
@@ -1593,7 +1593,7 @@ local function successful_payment(self, chat_id, language_code, update_data)
         return false
     end
 
-    local this = self:chat(this._chat_id, this._language_code)
+    local this = self:chat(chat_id, language_code)
 
     this.status = function(self)
         return "successful_payment", self

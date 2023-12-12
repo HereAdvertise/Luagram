@@ -232,13 +232,13 @@ local function catch_error()
     end
 end
 
-local function compose_parse(self, compose, ...)
+local function compose_parse(chat, compose, ...)
     -- é muito simples parsear uma mensagem
     --essa função de sex executada com pcall?
 
-    local users = self.__class._users
+    local users = chat.__class._users
 
-    local user = users:get(self._chat_id)
+    local user = users:get(chat._chat_id)
 
     if not user then
         compose:catch("user not found")
@@ -284,46 +284,46 @@ local function compose_parse(self, compose, ...)
                     if not ok then
                         compose:catch(...)
                     end
-                end)(pcall(item.value, self, unlist(compose.args))) --xpcall?
+                end)(pcall(item.value, chat, unlist(compose.args))) --xpcall?
                 compose._index = nil
 
             -- texts
             elseif item._type == "text" then
-                texts[#texts + 1] = escape(text(self, item.valu))
+                texts[#texts + 1] = escape(text(chat, item.valu))
                 close_tags()
             elseif item._type == "bold" then
                 open_tags[#open_tags + 1] = "</b>"
                 texts[#texts + 1] = "<b>"
                 if item.value then
-                    texts[#texts + 1] = escape(text(self, item.value))
+                    texts[#texts + 1] = escape(text(chat, item.value))
                     close_tags()
                 end
             elseif item._type == "italic" then
                 open_tags[#open_tags + 1] = "</i>"
                 texts[#texts + 1] = "<i>"
                 if item.value then
-                    texts[#texts + 1] = escape(text(self, item.value))
+                    texts[#texts + 1] = escape(text(chat, item.value))
                     close_tags()
                 end
             elseif item._type == "underline" then
                 open_tags[#open_tags + 1] = "</u>"
                 texts[#texts + 1] = "<u>"
                 if item.value then
-                    texts[#texts + 1] = escape(text(self, item.value))
+                    texts[#texts + 1] = escape(text(chat, item.value))
                     close_tags()
                 end
             elseif item._type == "spoiler" then
                 open_tags[#open_tags + 1] = "</tg-spoiler>"
                 texts[#texts + 1] = "<tg-spoiler>"
                 if item.value then
-                    texts[#texts + 1] = escape(text(self, item.value))
+                    texts[#texts + 1] = escape(text(chat, item.value))
                     close_tags()
                 end
             elseif item._type == "strike" then
                 open_tags[#open_tags + 1] = "</s>"
                 texts[#texts + 1] = "<s>"
                 if item.value then
-                    texts[#texts + 1] = escape(text(self, item.value))
+                    texts[#texts + 1] = escape(text(chat, item.value))
                     close_tags()
                 end
             elseif item._type == "link" then
@@ -331,31 +331,31 @@ local function compose_parse(self, compose, ...)
                 texts[#texts + 1] = '<a href="'
                 texts[#texts + 1] = escape(item.href)
                 texts[#texts + 1] = '">'
-                texts[#texts + 1] = escape(text(self, item.value))
+                texts[#texts + 1] = escape(text(chat, item.value))
                 texts[#texts + 1] = "</a>"
             elseif item._type == "mention" then
                 close_tags()
                 texts[#texts + 1] = '<a href="tg://user?id='
                 texts[#texts + 1] = escape(item.user)
                 texts[#texts + 1] = '">'
-                texts[#texts + 1] = escape(text(self, item.value))
+                texts[#texts + 1] = escape(text(chat, item.value))
                 texts[#texts + 1] = "</a>"
             elseif item._type == "emoji" then
                 close_tags()
                 texts[#texts + 1] = '<tg-emoji emoji-id="'
                 texts[#texts + 1] = escape(item.value)
                 texts[#texts + 1] = '">'
-                texts[#texts + 1] = escape(text(self, item.emoji))
+                texts[#texts + 1] = escape(text(chat, item.emoji))
                 texts[#texts + 1] = "</tg-emoji>"
             elseif item._type == "mono" then
                 close_tags()
                 texts[#texts + 1] = "<code>"
-                texts[#texts + 1] = escape(text(self, item.value))
+                texts[#texts + 1] = escape(text(chat, item.value))
                 texts[#texts + 1] = "</code>"
             elseif item._type == "pre" then
                 close_tags()
                 texts[#texts + 1] = "<pre>"
-                texts[#texts + 1] = escape(text(self, item.value))
+                texts[#texts + 1] = escape(text(chat, item.value))
                 texts[#texts + 1] = "</pre>"
             elseif item._type == "code" then
                 close_tags()
@@ -363,21 +363,21 @@ local function compose_parse(self, compose, ...)
                     texts[#texts + 1] = '<pre><code class="language-'
                     texts[#texts + 1] = escape(item.language)
                     texts[#texts + 1] = '">'
-                    texts[#texts + 1] = escape(text(self, item.value))
+                    texts[#texts + 1] = escape(text(chat, item.value))
                 else
                     texts[#texts + 1] = "<pre><code>"
-                    texts[#texts + 1] = escape(text(self, item.value))
+                    texts[#texts + 1] = escape(text(chat, item.value))
                 end
                 texts[#texts + 1] = "</code></pre>"
             elseif item._type == "line" then
                 if item.value then
-                    texts[#texts + 1] = escape(text(self, item.value))
+                    texts[#texts + 1] = escape(text(chat, item.value))
                 end
                 close_tags()
                 texts[#texts + 1] = "\n"
             elseif item._type == "html" then
                 close_tags()
-                texts[#texts + 1] = text(self, item.value)
+                texts[#texts + 1] = text(chat, item.value)
 
             -- others
             elseif item._type == "media" then
@@ -397,7 +397,7 @@ local function compose_parse(self, compose, ...)
             -- interactions
             elseif item._type == "button" then
                 row[#row + 1] = {
-                    text = text(self, item.label),
+                    text = text(chat, item.label),
                     callback_data = string.format("luagram_event_%s", item.button)
                 }
             elseif item._type == "action" then
@@ -407,8 +407,8 @@ local function compose_parse(self, compose, ...)
                         return action, ...
                     end
                 end
-                local label = text(self, item.label)
-                local uuid = string.format("luagram_action_%s_%s_%s", self._chat_id, id(self), os.time())
+                local label = text(chat, item.label)
+                local uuid = string.format("luagram_action_%s_%s_%s", chat._chat_id, id(chat), os.time())
                 interactions[#interactions + 1] = uuid
                 local interaction = {
                     compose = compose,
@@ -424,7 +424,7 @@ local function compose_parse(self, compose, ...)
                 }
             elseif item._type == "location" then
                 row[#row + 1] = {
-                    text = text(self, item.label),
+                    text = text(chat, item.label),
                     url = item.location
                 }
             elseif item._type == "transaction" then
@@ -434,7 +434,7 @@ local function compose_parse(self, compose, ...)
 
                 transaction = true
 
-                local label = text(self, item.label)
+                local label = text(chat, item.label)
 
                 if item.label ~= false then
                     table.insert(buttons, 1, {
@@ -446,7 +446,7 @@ local function compose_parse(self, compose, ...)
                     transaction_label = true
                 end
 
-                local uuid = string.format("luagram_transaction_%s_%s_%s", self._chat_id, id(self), os.time())
+                local uuid = string.format("luagram_transaction_%s_%s_%s", chat._chat_id, id(chat), os.time())
 
                 local interaction = {
                     compose = compose,
@@ -508,7 +508,7 @@ local function compose_parse(self, compose, ...)
     end
 
     if media_type == "id" then
-        local response, err = self.__class:get_file({
+        local response, err = chat.__class:get_file({
             file_id = media
         })
 
@@ -585,8 +585,8 @@ local function compose_parse(self, compose, ...)
         output.payload = payload
         output.start_parameter = payload
         output.protect_content = true
-        output.currency = self._class._currency
-        output.provider_token = self._class._provider_token
+        output.currency = chat._class._currency
+        output.provider_token = chat._class._provider_token
         output.prices = {price}
     else
 
@@ -612,7 +612,7 @@ local function compose_parse(self, compose, ...)
 
     end
 
-    output.chat_id = self._chat_id
+    output.chat_id = chat._chat_id
     if #buttons > 0 then
         output.reply_markup = {
             inline_keyboard	= buttons

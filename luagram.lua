@@ -498,16 +498,7 @@ local function compose_parse(chat, compose, ...)
         error("you can only define an url for transaction media")
     end
 
-    if transaction then
-        --check title
-        --check description
-        --check price
-        if not data.payload then
-            data.payload = payload
-        end
-    end
-
-    if media_type == "id" then
+    if media and media_type == "id" then
         local response, err = chat.__class:get_file({
             file_id = media
         })
@@ -526,7 +517,7 @@ local function compose_parse(chat, compose, ...)
             error(string.format("unknown file type: %s", file_path))
         end
 
-    elseif media_type == "url" then
+    elseif media and media_type == "url" then
         local response, status, headers = request(media)
 
         if not response then
@@ -553,7 +544,7 @@ local function compose_parse(chat, compose, ...)
             error(string.format("content type not found for media %s", media))
         end
 
-    elseif media_type == "path" then
+    elseif media and media_type == "path" then
 
         local extension = string.lower(assert(string.match(media, "([^%.]+)$"), "no extension"))
 
@@ -565,7 +556,7 @@ local function compose_parse(chat, compose, ...)
             error(string.format("unknown media type: %s", media))
         end
 
-    else
+    elseif media then
         error(string.format("unknown media type: %s", tostring(media)))
     end
 
@@ -580,6 +571,8 @@ local function compose_parse(chat, compose, ...)
         if media then
             output.photo_url = media
         end
+
+        method = "invoice"
         output.title = title
         output.description = description
         output.payload = payload
@@ -1392,6 +1385,9 @@ local function callback_query(self, chat_id, language_code, update_data)
                     --call session
                     --remove keyboard
                     --pssar os args
+                    for _, value in pairs(action.compose.interactions) do
+                        user.actions[value] = nil
+                    end
                     self.__class:edit_message_reply_markup({
                         chat_id = chat_id,
                         message_id = update_data.message_id
@@ -1405,6 +1401,9 @@ local function callback_query(self, chat_id, language_code, update_data)
                 error("object not found")
             end
         elseif type(result) == "table" and result._type == "session" then
+            for _, value in pairs(action.compose.interactions) do
+                user.actions[value] = nil
+            end
             self.__class:edit_message_reply_markup({
                 chat_id = chat_id,
                 message_id = update_data.message_id
@@ -1423,6 +1422,10 @@ local function callback_query(self, chat_id, language_code, update_data)
         --olhar a mensagem original e a parseada
         -- havendo incompatibilidadde
         --enviar uma mensagem nova (algumas resultados devem remover o teclado da original aidna)
+        -- qunadose remove o teclado
+        --para limpar a memoria
+        -- o correto é remover as interactions da mensagem antiga tambem
+        --as interactiosnda mensagem é obtida via mensagem_antiga.interactions
 
         -- compose_parse.
         -- edit current compose
@@ -1439,6 +1442,9 @@ local function callback_query(self, chat_id, language_code, update_data)
 
             --verificar se é possível alterar o teclado ainda
             --acredito que não
+            for _, value in pairs(action.compose.interactions) do
+                user.actions[value] = nil
+            end
             self.__class:edit_message_reply_markup({
                 chat_id = chat_id,
                 message_id = update_data.message_id
@@ -1468,7 +1474,9 @@ local function callback_query(self, chat_id, language_code, update_data)
         elseif not action.compose._media and this._media then
             --remover os botões da mensagem antiga
             --enviar uma nova mensagem
-
+            for _, value in pairs(action.compose.interactions) do
+                user.actions[value] = nil
+            end
             self.__class:edit_message_reply_markup({
                 chat_id = chat_id,
                 message_id = update_data.message_id
@@ -1476,6 +1484,10 @@ local function callback_query(self, chat_id, language_code, update_data)
             send(self, chat_id, this._name, ...)
 
             return
+        end
+
+        for _, value in pairs(action.compose.interactions) do
+            user.actions[value] = nil
         end
 
         local compose = compose_parse(chat, this, ...)
@@ -1756,7 +1768,7 @@ function luagram:receive(update)
 
         if string.match(update_data.data, "^luagram_action_%d+_%d+_%d+$") then
             --answer
-            
+
 
         end
 

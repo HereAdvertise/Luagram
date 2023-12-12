@@ -232,7 +232,7 @@ local function catch_error()
     end
 end
 
-local function message_parse(self, message, ...)
+local function compose_parse(self, compose, ...)
     -- é muito simples parsear uma mensagem
     --essa função de sex executada com pcall?
 
@@ -241,7 +241,7 @@ local function message_parse(self, message, ...)
     local user = users:get(self._chat_id)
 
     if not user then
-        message:catch("user not found")
+        compose:catch("user not found")
         return
     end
 
@@ -273,19 +273,19 @@ local function message_parse(self, message, ...)
     end
 
     local index = 1
-    while index <= #message do
-        local item = message[index]
+    while index <= #compose do
+        local item = compose[index]
         if type(item) == "table" and item._type then
 
             -- runtime
             if item._type == "run" then
-                message._index = index + 1
+                compose._index = index + 1
                 local _ = (function(ok, ...)
                     if not ok then
-                        message:catch(...)
+                        compose:catch(...)
                     end
-                end)(pcall(item.value, self, unlist(message.args))) --xpcall?
-                message._index = nil
+                end)(pcall(item.value, self, unlist(compose.args))) --xpcall?
+                compose._index = nil
 
             -- texts
             elseif item._type == "text" then
@@ -411,7 +411,7 @@ local function message_parse(self, message, ...)
                 local uuid = string.format("luagram_action_%s_%s_%s", self._chat_id, id(self), os.time())
                 interactions[#interactions + 1] = uuid
                 local interaction = {
-                    message = message,
+                    compose = compose,
                     label = label,
                     value = item.action,
                     interactions = interactions,
@@ -429,7 +429,7 @@ local function message_parse(self, message, ...)
                 }
             elseif item._type == "transaction" then
                 if transaction then
-                    error("transaction previously defined for this message")
+                    error("transaction previously defined for this compose")
                 end
 
                 transaction = true
@@ -449,7 +449,7 @@ local function message_parse(self, message, ...)
                 local uuid = string.format("luagram_transaction_%s_%s_%s", self._chat_id, id(self), os.time())
 
                 local interaction = {
-                    message = message,
+                    compose = compose,
                     label = label,
                     value = item.transaction,
                     interactions = interactions,
@@ -475,7 +475,7 @@ local function message_parse(self, message, ...)
     end
 
     if transaction and transaction_label and #buttons > 0 then
-        error("add a label to transaction function to define actions in this message")
+        error("add a label to transaction function to define actions in this compose")
     end
 
     if media then
@@ -593,13 +593,13 @@ local function message_parse(self, message, ...)
         if method == "animation" then
             if media then
                 output.animation = media
-                message._multipart = "animation"
+                compose._multipart = "animation"
             end
             output.caption = table.concat(texts)
         elseif method == "photo" then
             if media then
                 output.photo = media
-                message._multipart = "photo"
+                compose._multipart = "photo"
             end
             output.caption = table.concat(texts)
         else
@@ -627,10 +627,10 @@ local function message_parse(self, message, ...)
         output[key] = value
     end
 
-    message._method = method
-    message._output = output
+    compose._method = method
+    compose._output = output
 
-    return message
+    return compose
 end
 
 local function send(self, chat_id, language_code, name, ...)
@@ -657,7 +657,7 @@ local function send(self, chat_id, language_code, name, ...)
 
     local chat = self.__class:chat(chat_id, language_code)
 
-    if object._type == "message" then
+    if object._type == "compose" then
 
         local this = object:clone()
 
@@ -671,7 +671,7 @@ local function send(self, chat_id, language_code, name, ...)
             return self
         end
 
-        local result = message_parse(chat, this, ...)
+        local result = compose_parse(chat, this, ...)
 
         if result then
 
@@ -751,7 +751,7 @@ local function send(self, chat_id, language_code, name, ...)
 
     --verificar o ypo do objetoii
 
-    --se message: parsear um novo clone da mensage
+    --se compose: parsear um novo clone da mensage
     --(criar metodo: chat, send)
     --enviar
 
@@ -763,9 +763,9 @@ end
 
 local modules = {}
 
-modules.message = function(self)
+modules.compose = function(self)
 
-    self:class("message", function(self, name, ...)
+    self:class("compose", function(self, name, ...)
         if name == nil then
             name = "/start"
         end
@@ -779,7 +779,7 @@ modules.message = function(self)
         -- mas nesse caso não será possível salvar essa classe em __class
         --talvez seja necessário fazer self.__class._objects[name] = self na função receive mesmo
 
-        self._type = "message"
+        self._type = "compose"
         self._id = id(self)
         self._args = list(...)
         self._catch = catch_error
@@ -789,10 +789,10 @@ modules.message = function(self)
         end
     end)
 
-    local message = self.message
+    local compose = self.compose
 
-    message.clone = function(self)
-        local clone = self.__class:message(false)
+    compose.clone = function(self)
+        local clone = self.__class:compose(false)
         for key, value in pairs(self) do
             if key ~= "_id" and key ~= "__class" then
                 if type(value) == "table" then
@@ -864,18 +864,18 @@ modules.message = function(self)
 
     for index = 1, #items do
         local _type = items[index]
-        message[_type] = simple(_type, "value")
+        compose[_type] = simple(_type, "value")
     end
 
-    message.run = simple("run", "run")
+    compose.run = simple("run", "run")
 
-    message.link = multiple("link", "label", "url")
+    compose.link = multiple("link", "label", "url")
 
-    message.mention = multiple("mention", "user", "id")
+    compose.mention = multiple("mention", "user", "id")
 
-    message.emoji = multiple("emoji", "emoji", "placeholder")
+    compose.emoji = multiple("emoji", "emoji", "placeholder")
 
-    message.code = function(self, ...)
+    compose.code = function(self, ...)
         local index, language, code = ...
         local _index = self._index
         if type(index) == "number" and select("#", ...) > 1 then
@@ -896,7 +896,7 @@ modules.message = function(self)
         return self
     end
 
-    message.line = function(self, ...)
+    compose.line = function(self, ...)
         local index, line = ...
         local _index = self._index
         if type(index) == "number" then
@@ -912,17 +912,17 @@ modules.message = function(self)
         return self
     end
 
-    message.media = simple("media", "media")
+    compose.media = simple("media", "media")
 
-    message.title = simple("title", "value")
+    compose.title = simple("title", "value")
 
-    message.description = simple("description", "value")
+    compose.description = simple("description", "value")
 
-    message.price = multiple("price", "label", "amount")
+    compose.price = multiple("price", "label", "amount")
 
-    message.data = multiple("data", "key", "value")
+    compose.data = multiple("data", "key", "value")
 
-    message.button = function(self, ...)
+    compose.button = function(self, ...)
         local index, label, event = ...
         local _index = self._index
         if type(index) == "number" and select("#", ...) > 1 then
@@ -943,7 +943,7 @@ modules.message = function(self)
         return self
     end
 
-    message.action = function(self, ...)
+    compose.action = function(self, ...)
         local index, label, action = ...
         local _index = self._index
         if type(index) == "number" and select("#", ...) > 1 then
@@ -961,7 +961,7 @@ modules.message = function(self)
         return self
     end
 
-    message.location = function(self, ...)
+    compose.location = function(self, ...)
         local index, label, location = ...
         local _index = self._index
         if type(index) == "number" and select("#", ...) > 1 then
@@ -979,7 +979,7 @@ modules.message = function(self)
         return self
     end
 
-    message.transaction = function(self, ...)
+    compose.transaction = function(self, ...)
         local index, label, transaction = ...
         local _index = self._index
         if type(index) == "number" and select("#", ...) > 1 then
@@ -1001,7 +1001,7 @@ modules.message = function(self)
         return self
     end
 
-    message.row = function(self, ...)
+    compose.row = function(self, ...)
         local index = ...
         local _index = self._index
         if type(index) == "number" then
@@ -1076,7 +1076,7 @@ modules.chat = function(self)
     end
 
     chat.say = function(self, value)
-        self.__class:send_message({
+        self.__class:send_compose({
             chat_id = self._chat_id,
             value = text(self, value)
         })
@@ -1173,7 +1173,7 @@ function luagram.new(options)
     self._catch = catch_error
     self.__class = self
 
-    self:module("message")
+    self:module("compose")
     self:module("session")
     self:module("chat")
 
@@ -1290,7 +1290,7 @@ local function callback_query(self, chat_id, language_code, update_data)
     -- então copiar todos os itens do original e jogar no item novo novamente
     -- provavelmente a melhor maneira
 
-    local this = action.message:clone()
+    local this = action.compose:clone()
 
     this._update_data = update_data
     this._update_type = "callback_query"
@@ -1374,13 +1374,13 @@ local function callback_query(self, chat_id, language_code, update_data)
         end
 
         if result == true then
-            this = action.message._source:clone()
+            this = action.compose._source:clone()
         elseif result == false then
             this:clear("buttons")
         elseif type(result) == "string" then
             local object = self.__class._objects[result]
             if object then
-                if object._type == "message" then
+                if object._type == "compose" then
                     this = object:clone()
                 elseif  object._type == "session" then
                     --call session
@@ -1396,7 +1396,7 @@ local function callback_query(self, chat_id, language_code, update_data)
             --call session
             --passar os args
             return
-        elseif type(result) == "table" and result._type == "message" then
+        elseif type(result) == "table" and result._type == "compose" then
             this = result
         elseif result == nil then
             return
@@ -1409,15 +1409,15 @@ local function callback_query(self, chat_id, language_code, update_data)
         -- havendo incompatibilidadde
         --enviar uma mensagem nova (algumas resultados devem remover o teclado da original aidna)
 
-        -- message_parse.
-        -- edit current message
+        -- compose_parse.
+        -- edit current compose
 
         --necessário fazer um loop em action.interactions
         --cada key deve remover o action user.actions[...] = nil
         --caso a mensagem antiga precise for alterada
         --ou seja, chegue até aqui
 
-        if action.message._transaction then
+        if action.compose._transaction then
             --mensagem antiga é uma transaction
             --não pode ser alterada
             --enviar uma nova mensagem aqui
@@ -1429,10 +1429,10 @@ local function callback_query(self, chat_id, language_code, update_data)
             return
         end
 
-        if action.message._media and not this._media then
-            this._media = action.message._media
+        if action.compose._media and not this._media then
+            this._media = action.compose._media
 
-        elseif not action.message._media and this._media then
+        elseif not action.compose._media and this._media then
             --remover os botões da mensagem antiga
             --enviar uma nova mensagem
 
@@ -1468,7 +1468,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
 
     local transaction = user.interactions[payload]
 
-    local catch = transaction.message.catch
+    local catch = transaction.compose.catch
 
     if not transaction then
         return false
@@ -1570,7 +1570,7 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
 
     local transaction = user.interactions[payload]
 
-    local catch = transaction.message.catch
+    local catch = transaction.compose.catch
 
     if not transaction then
         return false
@@ -1679,7 +1679,7 @@ end
 
 local function chat_id(update_data, update_type)
     if update_type == "callback_query" then
-        return update_data.message.chat.id, update_data.message.from.language_code
+        return update_data.compose.chat.id, update_data.compose.from.language_code
     end
     return update_data.chat.id, update_data.from.language_code
 end
@@ -1738,7 +1738,7 @@ function luagram:receive(update)
             return
         end
 
-    elseif update_type == "message" and update_data.successful_payment  then
+    elseif update_type == "compose" and update_data.successful_payment  then
 
         if successful_payment(self, chat_id, update_data) == true then
             return
@@ -1799,7 +1799,7 @@ function luagram:receive(update)
     --testar e continuar caso esteja
 
     --vertificar se não é comando
-    if update_type == "message" then
+    if update_type == "compose" then
 
         local text = update_data.text
 
@@ -1848,7 +1848,7 @@ function luagram:receive(update)
 
     -- aqui deve acontecer um erro
 
-    --if update_type == "message" then ----? talvez não passe por esse if, pois pode ser um callback_query por exemplo
+    --if update_type == "compose" then ----? talvez não passe por esse if, pois pode ser um callback_query por exemplo
 
         -- verificar se é comando
         -- se for comando significa que é para "zerar" a sessão atual e iniciar nesse comando

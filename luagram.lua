@@ -809,7 +809,7 @@ modules.compose = function(self)
         if not clone._source then
             clone._source = self
         end
-        return clone, self
+        return clone
     end
 
     local function insert(self, data)
@@ -1215,7 +1215,7 @@ end
 
 function luagram:module(name, ...)
     if modules[name] then
-        return modules[name](self, ...) or self, self
+        return modules[name](self, ...) or self
     end
     local path = package.path
     package.path = "./modules/?.lua;" .. path
@@ -1224,7 +1224,7 @@ function luagram:module(name, ...)
     if not ok then
         error("module '" .. name .. "' not found")
     end
-    return module(self, ...) or self, self
+    return module(self, ...) or self
 end
 
 function luagram:locales(locales)
@@ -1313,10 +1313,10 @@ local function callback_query(self, chat_id, language_code, update_data)
         for index = 1, #self do
             if type(self[index]) == "table" and self[index]._type == "action" and self[index].id == action.id then
                 self[index].index = index
-                return self[index], self
+                return self[index]
             end
         end
-        return nil, self
+        return nil
     end
 
     this.redaction = function(self, label, action, ...)
@@ -1477,17 +1477,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
     local this = self:chat(chat_id, language_code)
 
     this.status = function(self)
-        return "shipping_query", self
-    end
-
-    this.say = function(self, ...)
-        this:say(...)
-        return self
-    end
-
-    this.send = function(self, ...)
-        this:send(...)
-        return self
+        return "shipping"
     end
 
     local _ = (function(ok, ...)
@@ -1579,17 +1569,7 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
     local this = self:chat(chat_id, language_code)
 
     this.status = function(self)
-        return "pre_checkout_query", self
-    end
-
-    this.say = function(self, ...)
-        this:say(...)
-        return self
-    end
-
-    this.send = function(self, ...)
-        this:send(...)
-        return self
+        return "review"
     end
 
     local _ = (function(ok, ...)
@@ -1659,17 +1639,7 @@ local function successful_payment(self, chat_id, language_code, update_data)
     local this = self:chat(chat_id, language_code)
 
     this.status = function(self)
-        return "successful_payment", self
-    end
-
-    this.say = function(self, ...)
-        this:say(...)
-        return self
-    end
-
-    this.send = function(self, ...)
-        this:send(...)
-        return self
+        return "complete"
     end
 
     pcall(transaction.transaction, this, unlist(action.args)) -- unlist(select("#", ...) > 0 and list(...) or action.args)

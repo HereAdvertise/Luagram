@@ -1746,6 +1746,20 @@ function luagram:receive(update)
             return
         end
 
+        local event = string.match(update_data.data, "^luagram_event_(%w+)$")
+
+        if event and self._events[event] then
+            if self._events[event](update) ~= false then
+                return
+            end
+        end
+
+        if string.match(update_data.data, "^luagram_action_%d+_%d+_%d+$") then
+            --answer
+            
+
+        end
+
         -- aqui deve -se verificar se o callback_query é o formato do luagram
         -- e responder de acordo
         --continuar para que seja enviado o entry point

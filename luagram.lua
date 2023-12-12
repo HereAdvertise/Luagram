@@ -593,13 +593,17 @@ local function compose_parse(self, compose, ...)
         if method == "animation" then
             if media then
                 output.animation = media
-                compose._multipart = "animation"
+                if multipart then
+                    compose._multipart = "animation"
+                end
             end
             output.caption = table.concat(texts)
         elseif method == "photo" then
             if media then
                 output.photo = media
-                compose._multipart = "photo"
+                if multipart then
+                    compose._multipart = "photo"
+                end
             end
             output.caption = table.concat(texts)
         else
@@ -627,6 +631,8 @@ local function compose_parse(self, compose, ...)
         output[key] = value
     end
 
+    compose._transaction = transaction
+    compose._media = media
     compose._method = method
     compose._output = output
 
@@ -1331,7 +1337,7 @@ local function callback_query(self, chat_id, language_code, update_data)
 
     this.clear = function(self, _type)
         local buttons = {
-            action = true, location = true, transaction = true, row = true
+            button = true, action = true, location = true, transaction = true, row = true
         }
         local texts ={
             text = true, bold = true, italic = true, underline = true, spoiler = true, strike = true, link = true, mention = true, mono = true, pre = true, line = true, html = true
@@ -1370,7 +1376,7 @@ local function callback_query(self, chat_id, language_code, update_data)
     local _ = (function(ok, result, ...)
 
         if not ok then
-            --catch: result
+            error(result)
         end
 
         if result == true then
@@ -1384,24 +1390,33 @@ local function callback_query(self, chat_id, language_code, update_data)
                     this = object:clone()
                 elseif  object._type == "session" then
                     --call session
+                    --remove keyboard
                     --pssar os args
+                    self.__class:edit_message_reply_markup({
+                        chat_id = chat_id,
+                        message_id = update_data.message_id
+                    })
+                    send(self, chat_id, object._name, ...)
                     return
                 else
-                    -- error: invalid object
+                   error("invalid object")
                 end
             else
-                --error: object not found
+                error("object not found")
             end
         elseif type(result) == "table" and result._type == "session" then
-            --call session
-            --passar os args
+            self.__class:edit_message_reply_markup({
+                chat_id = chat_id,
+                message_id = update_data.message_id
+            })
+            send(self, chat_id, result._name, ...)
             return
         elseif type(result) == "table" and result._type == "compose" then
             this = result
         elseif result == nil then
             return
         else
-            --catch error
+            error("invalid result")
         end
 
         --com o result, realizar a mensagem_parse aqui
@@ -1424,19 +1439,61 @@ local function callback_query(self, chat_id, language_code, update_data)
 
             --verificar se é possível alterar o teclado ainda
             --acredito que não
+            self.__class:edit_message_reply_markup({
+                chat_id = chat_id,
+                message_id = update_data.message_id
+            })
+            send(self, chat_id, this._name, ...)
+
             --nesse caso se a transaction possuir teclado, o que fazer??
             --inutilizar (action.transactions???)
             return
         end
 
-        if action.compose._media and not this._media then
-            this._media = action.compose._media
+        local media
+
+        if action.compose._media then
+            if not this._media then
+                this._media = action.compose._media
+            end
+
+            if action.compose._media ~= this._media then
+                self.__class:edit_message_media({
+                    chat_id = chat_id,
+                    message_id = this.message_id,
+                    media = this._media
+                })
+            end
 
         elseif not action.compose._media and this._media then
             --remover os botões da mensagem antiga
             --enviar uma nova mensagem
 
+            self.__class:edit_message_reply_markup({
+                chat_id = chat_id,
+                message_id = update_data.message_id
+            })
+            send(self, chat_id, this._name, ...)
+
             return
+        end
+
+        local compose = compose_parse(chat, this, ...)
+
+        if this._method == "message" then
+            self.__class:edit_message_caption({
+                chat_id = chat_id,
+                message_id = update_data.message_id,
+                text = compose._output.text,
+                reply_keyboard = compose._output.reply_keyboard
+            })
+        else
+            self.__class:edit_message_text({
+                chat_id = chat_id,
+                message_id = update_data.message_id,
+                caption = compose._output.caption,
+                reply_keyboard = compose._output.reply_keyboard
+            })
         end
 
     end)(pcall(action.action, this, unlist(action.args))) -- unlist(select("#", ...) > 0 and list(...) or action.args)

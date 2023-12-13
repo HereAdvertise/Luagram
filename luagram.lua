@@ -668,8 +668,8 @@ local function send(self, chat_id, language_code, name, ...)
             return self
         end
 
-        this.say = function(self, ...)
-            chat:say(...)
+        this.print = function(self, ...)
+            chat:print(...)
             return self
         end
 
@@ -707,7 +707,7 @@ local function send(self, chat_id, language_code, name, ...)
 
         local thread = user.thread
 
-        chat.listen =  function(_, match)
+        chat.await =  function(_, match)
             if type(match) == "function" then
                 thread.match = match
             else
@@ -1077,7 +1077,7 @@ modules.chat = function(self)
         return self
     end
 
-    chat.say = function(self, value)
+    chat.print = function(self, value)
         self.__class:send_compose({
             chat_id = self._chat_id,
             value = text(self, value)
@@ -1301,8 +1301,8 @@ local function callback_query(self, chat_id, language_code, update_data)
 
     local chat = self:chat(chat_id, language_code)
 
-    this.say = function(self, ...)
-        chat:say(...)
+    this.print = function(self, ...)
+        chat:print(...)
         return self
     end
 
@@ -1726,7 +1726,7 @@ local function chat_id(update_data, update_type)
     return update_data.chat.id, update_data.from.language_code
 end
 
-function luagram:receive(update)
+function luagram:update(update)
     -- obter o autor do dona do update
     -- verificar se o update não é um callback data query
     -- verificar se o update não é um comando
@@ -1942,6 +1942,33 @@ function luagram:receive(update)
 
     -- se não haver entry point, deve ser chamado o evento
 
+    return self
+end
+
+function luagram:start()
+    local offset
+    while true do
+        if self._stop then
+            self._stop = nil
+            break
+        end
+        local result = self:get_updates({
+            offset = offset
+        })
+        if result then
+            for _, update in pairs(result) do
+                if not offset or update.update_id > offset then
+                    offset = update.update_id 
+                end
+                self:update(update)
+            end
+        end
+    end
+    return self
+end
+
+function luagram:stop()
+    self._stop = true
     return self
 end
 

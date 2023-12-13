@@ -235,7 +235,7 @@ local function catch_error()
     end
 end
 
-local function compose_parse(chat, compose, ...)
+local function compose_parse(chat, compose) -- , ...
     -- é muito simples parsear uma mensagem
     --essa função de sex executada com pcall?
 
@@ -257,7 +257,7 @@ local function compose_parse(chat, compose, ...)
         parse_mode = "HTML"
     }
 
-    local media, media_type, media_extension
+    local media, media_type
     local title, description, price
 
     local multipart = false
@@ -1459,8 +1459,6 @@ local function callback_query(self, chat_id, language_code, update_data)
             return
         end
 
-        local media
-
         if action.compose._media then
             if not this._media then
                 this._media = action.compose._media
@@ -1548,7 +1546,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
 
     local this = self:chat(chat_id, language_code)
 
-    this.status = function(self)
+    this.status = function()
         return "shipping"
     end
 
@@ -1640,7 +1638,7 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
 
     local this = self:chat(chat_id, language_code)
 
-    this.status = function(self)
+    this.status = function()
         return "review"
     end
 
@@ -1710,7 +1708,7 @@ local function successful_payment(self, chat_id, language_code, update_data)
 
     local this = self:chat(chat_id, language_code)
 
-    this.status = function(self)
+    this.status = function()
         return "complete"
     end
 
@@ -1734,7 +1732,7 @@ function luagram:update(update)
     -- caso não haja, ir para o entry point (se houver)
     -- caso não seja processado, enviar aos events
 
-    local update_id, update_type, update_data
+    local update_type, update_data
 
     assert(type(update) == "table", "invalid update")
     assert(not update.update_id, "invalid update")
@@ -1958,7 +1956,7 @@ function luagram:start()
         if result then
             for _, update in pairs(result) do
                 if not offset or update.update_id > offset then
-                    offset = update.update_id 
+                    offset = update.update_id
                 end
                 self:update(update)
             end

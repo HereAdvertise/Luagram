@@ -24,9 +24,9 @@ local function detect()
     end
     local ok = pcall(_G.GetRedbeanVersion)
     if ok then
-        http_provider = Fetch
-        json_encoder = EncodeJson
-        json_decoder = DecodeJson
+        http_provider = _G.Fetch
+        json_encoder = _G.EncodeJson
+        json_decoder = _G.DecodeJson
         return
     end
     local ok, ngx_http = pcall(require, "lapis.nginx.http")
@@ -1932,7 +1932,7 @@ function luagram:receive(update)
         -- se não for comando verificar se há sessão atual
         -- se não houver: criar a sessão com base  echmar o entry point (Se houver)
         -- se já houver: continuar (se for thread) ou chmar o entry point (Se houver)
-        
+
 
 
     --end

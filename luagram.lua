@@ -7,8 +7,8 @@ local function list(...)
     return {["#"] = select("#", ...), ...}
 end
 
-local function unlist(list)
-    return unpack(list, 1, list["#"])
+local function unlist(value)
+    return unpack(value, 1, value["#"])
 end
 
 local function id(self)
@@ -22,14 +22,16 @@ local function detect()
     if http_provider then
         return
     end
-    local ok = pcall(_G.GetRedbeanVersion)
+    local ok 
+    ok = pcall(_G.GetRedbeanVersion)
     if ok then
         http_provider = _G.Fetch
         json_encoder = _G.EncodeJson
         json_decoder = _G.DecodeJson
         return
     end
-    local ok, ngx_http = pcall(require, "lapis.nginx.http")
+    local ngx_http
+    ok, ngx_http = pcall(require, "lapis.nginx.http")
     if _G.ngx and ok then
         http_provider = function(url, options)
             return ngx_http.simple(url, options)
@@ -58,8 +60,8 @@ end
 detect()
 
 local function request(self, url, options)
-    local http_provider = self.__class._http_provider or http_provider
-    local response, response_status, headers = http_provider(url, options)
+    local _http_provider = self.__class._http_provider or http_provider
+    local response, response_status, headers = _http_provider(url, options)
     local response_headers
     if response_status == 200 and type(headers) == "table" then
         response_headers = {}
@@ -74,7 +76,7 @@ local function generate_boundary()
     local alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
     math.randomseed(os.time())
     local result = {}
-    for index = 1, 64 do
+    for _ = 1, 64 do
         local number = math.random(1, #alpha)
         result[#result + 1] = string.sub(alpha, number, number)
     end
@@ -92,8 +94,8 @@ local function telegram(self, method, data, multipart)
     --multipart é nome da key que é o arquivo multipart
     --então se haver esse argumento é multipart
     --sendo multipart, ao passar por essa keu ele encoda como multipart
-    local json_encoder = self.__class._json_encoder or json_encoder
-    local json_decoder = self.__class._json_decoder or json_decoder
+    local _json_encoder = self.__class._json_encoder or json_encoder
+    local _json_decoder = self.__class._json_decoder or json_decoder
     local api = self.__class._api or "https://api.telegram.org/bot%s/%s"
     api = string.format(api, self.__class._token, string.gsub(method, "%W", ""))
     local headers, body
@@ -121,21 +123,20 @@ local function telegram(self, method, data, multipart)
             else
                 body[#body + 1] = "\r\n\r\n"
                 if type(value) == "table" then
-                    body[#body + 1] = json_encoder(value)
+                    body[#body + 1] = _json_encoder(value)
                 else
                     body[#body + 1] = tostring(value)
                 end
             end
             body[#body + 1] = "\r\n"
         end
-        content = nil
         body = table.concat(body)
         headers = {
             ["content-type"] = string.format("multipart/form-data; boundary=%s", boundary),
             ["content-length"] = #body
         }
     else
-        body = json_encoder(data)
+        body = _json_encoder(data)
         headers = {
             ["content-type"] = "application/json",
             ["content-length"] = #body
@@ -152,7 +153,7 @@ local function telegram(self, method, data, multipart)
         headers = headers
     })
     --check for errors
-    local result = json_decoder(response)
+    local result = _json_decoder(response)
     return result, response, response_status, response_headers
 end
 
@@ -191,15 +192,17 @@ local function locale(self, value, number)
 end
 
 local function format(values)
-    local result = string.gsub(values[1], "(%%?)(%%[%-%+#%.%d]*[cdiouxXeEfgGqsaAp])%[(%w+)%]", function(prefix, specifier, name)
-        if prefix == "%" then
-            return string.format("%%%s[%s]", specifier, name)
+    local result = string.gsub(values[1], "(%%?)(%%[%-%+#%.%d]*[cdiouxXeEfgGqsaAp])%[(%w+)%]",
+        function(prefix, specifier, name)
+            if prefix == "%" then
+                return string.format("%%%s[%s]", specifier, name)
+            end
+            if not values[name] then
+                error("no key '" .. name .. "' for string found")
+            end
+            return string.format(specifier, (string.gsub(values[name], "%%", "%%%%")))
         end
-        if not values[name] then
-            error("no key '" .. name .. "' for string found")
-        end
-        return string.format(specifier, (string.gsub(values[name], "%%", "%%%%")))
-    end)
+    )
     local ok
     ok, result = pcall(string.format, result, unpack(values, 2))
     if not ok then

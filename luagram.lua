@@ -1767,9 +1767,10 @@ function luagram:receive(update)
         end
 
         if string.match(update_data.data, "^luagram_action_%d+_%d+_%d+$") then
-            --answer
-
-
+            self.__class:answer_callback_query({
+                callback_query_id = update_data.id,
+                text = text(self:chat(chat_id, language_code), {"Welcome back! This message is outdated. Let's start over!"})
+            })
         end
 
         -- aqui deve -se verificar se o callback_query é o formato do luagram
@@ -1785,15 +1786,37 @@ function luagram:receive(update)
             return
         end
 
+        if string.match(update_data.invoice_payload, "^luagram_transaction_%d+_%d+_%d+$") then
+            self.__class:answer_shipping_quer({
+                shipping_query_id = update_data.id,
+                ok = false,
+                error_message = text(self:chat(chat_id, language_code), {"Unfortunately, there was an issue while completing this payment."})
+            })
+            return
+        end
+
     elseif update_type == "pre_checkout_query" then
 
         if pre_checkout_query(self, chat_id, update_data) == true then
             return
         end
 
+        if string.match(update_data.invoice_payload, "^luagram_transaction_%d+_%d+_%d+$") then
+            self.__class:answer_pre_checkout_query({
+                pre_checkout_query_id = update_data.id,
+                ok = false,
+                error_message = text(self:chat(chat_id, language_code), {"Unfortunately, it wasn't possible to complete this payment. Please start the process again in the bot."})
+            })
+            return
+        end
+
     elseif update_type == "compose" and update_data.successful_payment  then
 
         if successful_payment(self, chat_id, update_data) == true then
+            return
+        end
+
+        if string.match(update_data.invoice_payload, "^luagram_transaction_%d+_%d+_%d+$") then
             return
         end
 

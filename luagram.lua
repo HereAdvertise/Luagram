@@ -822,7 +822,7 @@ modules.compose = function(self)
         end
     end
 
-    local function simple(_type, arg1)
+    local function simple(_type, arg1) -- luacheck: ignore
         return function(self, ...)
             local index, value1 = ...
             local _index = self._index
@@ -840,7 +840,7 @@ modules.compose = function(self)
         end
     end
 
-    local function multiple(_type, arg1, arg2)
+    local function multiple(_type, arg1, arg2) -- luacheck: ignore
         return function(self, ...)
             local index, value1, value2 = ...
             local _index = self._index
@@ -1331,7 +1331,7 @@ local function callback_query(self, chat_id, language_code, update_data)
         return self
     end
 
-    this.clear = function(self, _type)
+    this.clear = function(self, _type) -- luacheck: ignore
         local buttons = {
             button = true, action = true, location = true, transaction = true, row = true
         }

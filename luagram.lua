@@ -22,7 +22,7 @@ local function detect()
     if http_provider then
         return
     end
-    local ok 
+    local ok
     ok = pcall(_G.GetRedbeanVersion)
     if ok then
         http_provider = _G.Fetch
@@ -567,7 +567,7 @@ local function compose_parse(chat, compose, ...)
     --se for transaction colocar pra mostrar recibo e mdata
     --olhar botgram
 
-    --dependendo do método da mensagem e havendo multipart 
+    --dependendo do método da mensagem e havendo multipart
     --colocar o nome do field aqui
 
     if transaction then
@@ -741,7 +741,7 @@ local function send(self, chat_id, language_code, name, ...)
     return true
 
     -- essa função é chamada para criar um novo objeto para self
-    
+
     --?? uma coisa que devemos fazer é preporcessar o name se self._objects[name]
     --porque pode ser passado nomes traduzíveis
     --mas o problema, em que momento?
@@ -776,7 +776,7 @@ modules.compose = function(self)
         -- {""}
         -- exceção é /start
         -- mesma coisa para a session
-        -- mas para detectar o idioma (para a função text) 
+        -- mas para detectar o idioma (para a função text)
         -- necessário ter o update aqui
         -- mas nesse caso não será possível salvar essa classe em __class
         --talvez seja necessário fazer self.__class._objects[name] = self na função receive mesmo
@@ -1100,7 +1100,7 @@ function lru.new(size)
     self._size = size
     self._length = 0
     self._items = {}
-    return self  
+    return self
 end
 
 function lru:set(key, value)
@@ -1283,7 +1283,7 @@ local function callback_query(self, chat_id, language_code, update_data)
 
     action.lock = true
 
-   
+
 
     -- necessáriorealizar uma copia da mensagem original
     -- essa mensagem é passada a função
@@ -1575,7 +1575,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
             self.__class:answer_shipping_query({
                 shipping_query_id = update_data.id,
                 ok = false,
-                error_message = text(self, {"Sorry, delivery to your desired address is unavailable."})          
+                error_message = text(self, {"Sorry, delivery to your desired address is unavailable."})
             })
         elseif select("#", ...) >  0 then
             local results = {...}
@@ -1596,7 +1596,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
                     })
                     return catch(string.format("error on proccess shipping query: invalid return value"))
                 end
-            end 
+            end
             self.__class:answer_shipping_query({
                 shipping_query_id = update_data.id,
                 ok = true,
@@ -1612,7 +1612,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
             return catch(string.format("error on proccess shipping query: invalid return value"))
         end
 
-    end)(pcall(transaction.transaction, this, unlist(action.args))) -- unlist(select("#", ...) > 0 and list(...) or action.args)
+    end)(pcall(transaction.transaction, this, unlist(transaction.args))) -- unlist(select("#", ...) > 0 and list(...) or action.args)
 
 end
 
@@ -1667,7 +1667,7 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
             self.__class:answer_pre_checkout_query({
                 pre_checkout_query_id = update_data.id,
                 ok = false,
-                error_message = text(self, {"Sorry, it won't be possible to complete the payment for the item you selected. Please try again in the bot."})          
+                error_message = text(self, {"Sorry, it won't be possible to complete the payment for the item you selected. Please try again in the bot."})
             })
         elseif result == true then
             self.__class:answer_pre_checkout_query({
@@ -1684,7 +1684,7 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
             return catch(string.format("error on proccess pre checkout query: invalid return value"))
         end
 
-    end)(pcall(transaction.transaction, this, unlist(action.args))) -- unlist(select("#", ...) > 0 and list(...) or action.args)
+    end)(pcall(transaction.transaction, this, unlist(transaction.args))) -- unlist(select("#", ...) > 0 and list(...) or action.args)
 
 end
 
@@ -1714,7 +1714,7 @@ local function successful_payment(self, chat_id, language_code, update_data)
         return "complete"
     end
 
-    pcall(transaction.transaction, this, unlist(action.args)) -- unlist(select("#", ...) > 0 and list(...) or action.args)
+    pcall(transaction.transaction, this, unlist(transaction.args)) -- unlist(select("#", ...) > 0 and list(...) or action.args)
 
     return true
 end

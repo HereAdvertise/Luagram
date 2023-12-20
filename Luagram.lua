@@ -1,6 +1,3 @@
---local ltn12 = require("ltn12") -- luarocks install luasocket
---local cjson = require("cjson") -- luarocks install lua-cjson
-
 local unpack = table.unpack or unpack
 
 local function list(...)

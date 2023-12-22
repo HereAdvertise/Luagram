@@ -718,7 +718,7 @@ local function send_object(self, chat_id, language_code, name, ...)
         end
 
         local result = parse_compose(chat, this, ...)
-        
+
         if object._predispatch then
             local parsed_result = object._predispatch(result)
             if type(parsed_result) == "table" then
@@ -727,7 +727,7 @@ local function send_object(self, chat_id, language_code, name, ...)
         end
 
         if result then
-            
+
             local response, err
 
             if result._method == "animation" then
@@ -741,11 +741,11 @@ local function send_object(self, chat_id, language_code, name, ...)
             else
                 error("invalid method")
             end
-            
+
             if not response then
                 error(err)
             end
-            
+
             if object._dispatch then
                 object._dispatch(response)
             end
@@ -1083,7 +1083,7 @@ addons.compose = function(self)
         self._index = _index
         return self
     end
-    
+
     compose.dispatch = function(self, dispatch, before)
         if before then
             self._predispatch = dispatch
@@ -1264,7 +1264,7 @@ function Luagram.new(options)
     self._actions = {}
     self._catch = catch_error
     self.__class = self
-    
+
     self._token = options.token
 
     self:addon("compose")
@@ -1405,7 +1405,7 @@ local function callback_query(self, chat_id, language_code, update_data)
         chat:send(...)
         return self
     end
-    
+
     this.update = function(self)
         return self._update_data, self._update_type
     end
@@ -1567,13 +1567,13 @@ local function callback_query(self, chat_id, language_code, update_data)
         for _, value in pairs(action.interactions) do
             user.interactions[value] = nil
         end
-        
+
 --        print("antes")
---        for k,v in pairs(this) do 
+--        for k,v in pairs(this) do
 --            print(k,v)
 --            if type(v) =="table" then
---                for k2,v2 in pairs(v) do 
---                    print(" "," ",k2, v2) 
+--                for k2,v2 in pairs(v) do
+--                    print(" "," ",k2, v2)
 --                end
 --            end
 --        end
@@ -1581,17 +1581,17 @@ local function callback_query(self, chat_id, language_code, update_data)
         local compose = parse_compose(chat, this, unlist(select("#", ...) > 0 and list(...) or action.args))
 
 --        print("depois")
---        for k,v in pairs(compose) do 
+--        for k,v in pairs(compose) do
 --            print(k,v)
 --            if type(v) =="table" then
---                for k2,v2 in pairs(v) do 
---                    print(" "," ",k2, v2) 
---                end
+--                for k2,v2 in pairs(v) do
+--                    print(" "," ",k2, v2)
+--                enn
 --            end
 --        end
 
         local ok, message
-        
+
         if not compose then
             action.compose._catch("parser error")
             return
@@ -1615,7 +1615,7 @@ local function callback_query(self, chat_id, language_code, update_data)
                 reply_markup = compose._output.reply_markup
             })
         end
-        
+
         if not ok then
             action.compose._catch(message)
         end
@@ -1652,7 +1652,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
     if not transaction then
         return false
     end
-    
+
     local catch = transaction.compose._catch
 
     local this = self:chat(chat_id, language_code)
@@ -1660,7 +1660,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
     this.status = function()
         return "shipping"
     end
-    
+
     this.payload = function()
         return update_data, "shipping_query"
     end
@@ -1759,7 +1759,7 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
     this.status = function()
         return "review"
     end
-    
+
     this.payload = function()
         return update_data, "pre_checkout_query"
     end
@@ -1806,7 +1806,7 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
             return
         end
 
-    end)(pcall(transaction.transaction, this, unlist(transaction.args))) 
+    end)(pcall(transaction.transaction, this, unlist(transaction.args)))
 
 end
 
@@ -1835,7 +1835,7 @@ local function successful_payment(self, chat_id, language_code, update_data)
     this.status = function()
         return "complete"
     end
-    
+
     this.payload = function()
         return update_data, "successful_payment"
     end
@@ -1869,7 +1869,7 @@ local function parse_update(self, update)
     if not update_type or not update_data then
         error("invalid update")
     end
-    
+
     local user = self._users:get(id)
 
     local chat_id, language_code = chat_id(update_data, update_type)
@@ -1885,7 +1885,7 @@ local function parse_update(self, update)
         local event, arg = string.match(update_data.data, "^Luagram_event_(%w+)_?(%d*)$")
 
         if event then
-            
+
             if arg == "" then
                 arg = nil
             end
@@ -1893,7 +1893,7 @@ local function parse_update(self, update)
             self.__class:answer_callback_query({
                 callback_query_id = update_data.id
             })
-            
+
             print("é evento", event)
             if self._events[event] and self._events[event](update_data, arg) ~= false then
                 print("aqui1")
@@ -1905,7 +1905,7 @@ local function parse_update(self, update)
                 self._events[true](update_data, arg)
                 return self
             end
-            
+
             if self._events.unhandled then
                 self._events.unhandled(update._response)
                 return self
@@ -2047,8 +2047,8 @@ local function parse_update(self, update)
             end
 
         end
-    
-    
+
+
         --0 nada foi processado até aqui
         --chamar o entry point se haver
 
@@ -2072,7 +2072,7 @@ local function parse_update(self, update)
         self._events[true](update)
         return self
     end
-    
+
     if self._events.unhandled then
         self._events.unhandled(update._response)
         return self
@@ -2094,7 +2094,7 @@ function Luagram:update(update)
 
 
     xpcall(function()
-        
+
         if type(update) ~= "table" then
             error(string.format("invalid update: %s", update))
         end

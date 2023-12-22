@@ -10,11 +10,9 @@ local function new()
 end
 
 local function test(bot, update, fn)
-    bot._http_provider = function(url, options)
-        return {
-            ok = true,
-            result = fn(options.body)
-        }, 200
+    bot._http_provider = function(_, options)
+        fn(options.body)
+        return {ok = true, result = options.body}, 200
     end
     bot:update(update)
 end
@@ -62,7 +60,7 @@ describe("compose", function()
                 chat_id = 101010101,
                 parse_mode = "HTML",
                 text = "ok",
-            }) return r end)
+            }) end)
 
         end)
 

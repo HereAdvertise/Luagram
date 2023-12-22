@@ -62,7 +62,7 @@ describe("compose", function()
                 chat_id = 101010101,
                 parse_mode = "HTML",
                 text = "ok",
-            }) end)
+            }) return r end)
 
         end)
 

@@ -61,8 +61,6 @@ local function detect_env()
     end
 end
 
-detect_env()
-
 local function stdout(message)
     print(message)
     io.stdout:write("Luagram: ", os.date("!%Y-%m-%d %H:%M:%S GMT: "), message, "\n")
@@ -1263,6 +1261,9 @@ function Luagram.new(options)
     self._users = lru.new(options.cache or 1024)
     self._actions = {}
     self._catch = catch_error
+    self._http_provider = options.http_provider
+    self._json_encoder = options.json_encoder
+    self._json_decoder = options.json_decoder
     self.__class = self
 
     self._token = options.token
@@ -1272,6 +1273,10 @@ function Luagram.new(options)
     self:addon("chat")
 
     self:on_unhandled(stdout)
+
+    if not self._http_provider and not http_provider then
+        detect_env()
+    end
 
     return self
 end
@@ -2155,4 +2160,3 @@ return setmetatable(Luagram, {
       return self.new(...)
   end
 })
-

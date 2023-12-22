@@ -15,7 +15,7 @@ end
 
 local http_provider, json_encoder, json_decoder
 
-local function detect()
+local function detect_env()
     if http_provider then
         return
     end
@@ -49,12 +49,29 @@ local function detect()
         local response = table.concat(out)
         return response, status, headers
     end
-    local json = require("cjson")
-    json_encoder = json.encode
-    json_decoder = json.decode
+    local json
+    ok, json = pcall(require, "cjson")
+    if ok then
+        json_encoder = json.encode
+        json_decoder = json.decode
+    else
+        json = require("json")
+        json_encoder = json.encode
+        json_decoder = json.decode
+    end
 end
 
-detect()
+detect_env()
+
+local function stdout(message)
+    print(message)
+    io.stdout:write("Luagram: ", os.date("!%Y-%m-%d %H:%M:%S GMT: "), message, "\n")
+end
+
+local function stderr(message)
+    print("[Error] ", message)
+    io.stderr:write("Luagram: ", os.date("!%Y-%m-%d %H:%M:%S GMT: "), "[Error] ", message, "\n")
+end
 
 local function request(self, url, options)
     local _http_provider = self.__class._http_provider or http_provider
@@ -88,6 +105,7 @@ local mimetypes = {
 }
 
 local function telegram(self, method, data, multipart)
+
     --multipart é nome da key que é o arquivo multipart
     --então se haver esse argumento é multipart
     --sendo multipart, ao passar por essa keu ele encoda como multipart
@@ -144,14 +162,28 @@ local function telegram(self, method, data, multipart)
             headers[string.lower(key)] = value
         end
     end
+    print("-->", body)
     local response, response_status, response_headers = request(self, api, {
         method = "POST",
         body = body,
         headers = headers
     })
-    --check for errors
-    local result = _json_decoder(response)
-    return result, response, response_status, response_headers
+    print("<--", response)
+    if response_status ~= 200 then
+        return nil, response, response_status, response_headers
+    end
+    local ok, result = pcall(_json_decoder, response)
+    if ok and type(result) == "table" then
+        if not result.ok then
+            return false, string.format("%s: %s", result.error_code, result.description), response, response_status, response_headers
+        end
+        result = result.result
+        if type(result) == "table" then
+            result._response = response
+        end
+        return result, response, response_status, response_headers
+    end
+    return nil, result, response, response_status, response_headers
 end
 
 local function escape(text)
@@ -226,13 +258,21 @@ local function text(self, value)
     return value
 end
 
-local function catch_error()
-    return function(...)
-        error((...), -1, select(2, ...))
+local function catch_error(...)
+    local message = {}
+    for index = 1, select("#", ...) do
+        message[#message + 1] = tostring(select(index, ...))
     end
+    stderr(debug.traceback(table.concat(message, "\n\n")))
 end
 
-local function compose_parse(chat, compose) -- , ...
+-- se acontecer algum erro nas funções runtime do compose: catch do compose
+-- caso contrario catch da instance
+
+-- se acontecer algum erro na função main da session: catch da session
+-- caso contrario catch da instance
+
+local function parse_compose(chat, compose, ...)
     -- é muito simples parsear uma mensagem
     --essa função de sex executada com pcall?
 
@@ -282,14 +322,15 @@ local function compose_parse(chat, compose) -- , ...
                 compose._index = index + 1
                 local _ = (function(ok, ...)
                     if not ok then
-                        compose:catch(...)
+                        compose._catch(...)
+                        return
                     end
-                end)(pcall(item.value, chat, unlist(compose.args))) --xpcall?
+                end)(pcall(item.value, chat, unlist(select("#", ...) > 0 and list(...) or compose.args)))
                 compose._index = nil
 
             -- texts
             elseif item._type == "text" then
-                texts[#texts + 1] = escape(text(chat, item.valu))
+                texts[#texts + 1] = escape(text(chat, item.value))
                 close_tags()
             elseif item._type == "bold" then
                 open_tags[#open_tags + 1] = "</b>"
@@ -371,6 +412,9 @@ local function compose_parse(chat, compose) -- , ...
                 texts[#texts + 1] = "</code></pre>"
             elseif item._type == "line" then
                 if item.value then
+                    if texts[#texts] ~= "\n" then
+                        texts[#texts + 1] = "\n"
+                    end
                     texts[#texts + 1] = escape(text(chat, item.value))
                 end
                 close_tags()
@@ -396,9 +440,13 @@ local function compose_parse(chat, compose) -- , ...
 
             -- interactions
             elseif item._type == "button" then
+                local event = string.format("Luagram_event_%s", item.event)
+                if tonumber(item.arg) then
+                    event = string.format("%s_%s", event, item.arg)
+                end
                 row[#row + 1] = {
                     text = text(chat, item.label),
-                    callback_data = string.format("luagram_event_%s", item.button)
+                    callback_data = event
                 }
             elseif item._type == "action" then
                 if type(item.action) == "string" then
@@ -408,14 +456,14 @@ local function compose_parse(chat, compose) -- , ...
                     end
                 end
                 local label = text(chat, item.label)
-                local uuid = string.format("luagram_action_%s_%s_%s", chat._chat_id, id(chat), os.time())
+                local uuid = string.format("Luagram_action_%s_%s_%s", chat._chat_id, id(chat), os.time())
                 interactions[#interactions + 1] = uuid
                 local interaction = {
                     compose = compose,
                     label = label,
-                    value = item.action,
+                    action = item.action,
                     interactions = interactions,
-                    args = 1 --> qual args?
+                    args = select("#", ...) > 0 and list(...) or compose.args
                 }
                 user.interactions[uuid] = interaction
                 row[#row + 1] = {
@@ -446,14 +494,14 @@ local function compose_parse(chat, compose) -- , ...
                     transaction_label = true
                 end
 
-                local uuid = string.format("luagram_transaction_%s_%s_%s", chat._chat_id, id(chat), os.time())
+                local uuid = string.format("Luagram_transaction_%s_%s_%s", chat._chat_id, id(chat), os.time())
 
                 local interaction = {
                     compose = compose,
                     label = label,
                     value = item.transaction,
                     interactions = interactions,
-                    args = 1 --> qual args?
+                    args = select("#", ...) > 0 and list(...) or compose.args
                 }
 
                 payload = uuid
@@ -632,16 +680,16 @@ local function compose_parse(chat, compose) -- , ...
     return compose
 end
 
-local function send(self, chat_id, language_code, name, ...)
+local function send_object(self, chat_id, language_code, name, ...)
 
     local users = self.__class._users
-    local catch = self.__class._catch
     local objects = self.__class._objects
 
     local user = users:get(chat_id)
 
     if not user then
         users:set(chat_id, {
+            created_at = os.time(),
             interactions = {}
         })
         user = users:get(chat_id)
@@ -650,8 +698,7 @@ local function send(self, chat_id, language_code, name, ...)
     local object = objects[name]
 
     if not object then
-        catch(string.format("object not found: %s", name))
-        return
+        error(string.format("object not found: %s", name))
     end
 
     local chat = self.__class:chat(chat_id, language_code)
@@ -670,20 +717,37 @@ local function send(self, chat_id, language_code, name, ...)
             return self
         end
 
-        local result = compose_parse(chat, this, ...)
+        local result = parse_compose(chat, this, ...)
+        
+        if object._predispatch then
+            local parsed_result = object._predispatch(result)
+            if type(parsed_result) == "table" then
+                result = parsed_result
+            end
+        end
 
         if result then
+            
+            local response, err
 
             if result._method == "animation" then
-                self.__class:send_animation(result._output)
+                response, err = self.__class:send_animation(result._output)
             elseif result._method == "photo" then
-                self.__class:send_photo(result._output)
+                response, err = self.__class:send_photo(result._output)
             elseif result._method == "message" then
-                self.__class:send_message(result._output)
+                response, err = self.__class:send_message(result._output)
             elseif result._method == "invoice" then
-                self.__class:send_invoice(result._output)
+                response, err = self.__class:send_invoice(result._output)
             else
                 error("invalid method")
+            end
+            
+            if not response then
+                error(err)
+            end
+            
+            if object._dispatch then
+                object._dispatch(response)
             end
 
         else
@@ -696,7 +760,7 @@ local function send(self, chat_id, language_code, name, ...)
         --chmar a nova sessão
 
         if not object._main then
-            catch(string.format("undefined main session thread: %s", name))
+            error(string.format("undefined main session thread: %s", name))
             return
         end
 
@@ -720,7 +784,7 @@ local function send(self, chat_id, language_code, name, ...)
         local ok, err = coroutine.resume(thread.main, thread.self, unlist(select("#", ...) > 0 and list(...) or object._args))
 
         if not ok then
-            object:catch(string.format("error on execute main session thread (%s): %s", name, err))
+            object._catch(string.format("error on execute main session thread: %s", err))
             return
         end
 
@@ -730,8 +794,7 @@ local function send(self, chat_id, language_code, name, ...)
 
     else
 
-        catch(string.format("undefined object type: %s", name))
-        return
+        error(string.format("undefined object type: %s", name))
 
     end
 
@@ -760,9 +823,9 @@ local function send(self, chat_id, language_code, name, ...)
 
 end
 
-local modules = {}
+local addons = {}
 
-modules.compose = function(self)
+addons.compose = function(self)
 
     self:class("compose", function(self, name, ...)
         if name == nil then
@@ -781,7 +844,7 @@ modules.compose = function(self)
         self._type = "compose"
         self._id = id(self)
         self._args = list(...)
-        self._catch = catch_error
+        self:catch(catch_error)
         self._name = name
         if name ~= false then
             self.__class._objects[name] = self
@@ -905,7 +968,7 @@ modules.compose = function(self)
         end
         insert(self, {
             _type = "line",
-            line = line
+            value = line
         })
         self._index = _index
         return self
@@ -922,21 +985,29 @@ modules.compose = function(self)
     compose.data = multiple("data", "key", "value")
 
     compose.button = function(self, ...)
-        local index, label, event = ...
+        local index, label, event, arg = ...
         local _index = self._index
         if type(index) == "number" and select("#", ...) > 1 then
             self._index = index
         else
+            arg = event
             event = label
             label = index
         end
         if #event > 15 or string.match(event, "%W") then
             error(string.format("invalid event name: %s", event))
         end
+        if arg then
+            arg = tonumber(arg)
+            if not arg then
+                error(string.format("invalid argument: %s", arg))
+            end
+        end
         insert(self, {
             _type = "button",
             label = label,
-            event = event
+            event = event,
+            arg = arg
         })
         self._index = _index
         return self
@@ -1012,11 +1083,27 @@ modules.compose = function(self)
         self._index = _index
         return self
     end
+    
+    compose.dispatch = function(self, dispatch, before)
+        if before then
+            self._predispatch = dispatch
+        else
+            self._dispatch = dispatch
+        end
+        return self
+    end
+
+    compose.catch = function(self, catch)
+        self._catch = function(...)
+            catch(self._name, ...)
+        end
+        return self
+    end
 
     return self
 end
 
-modules.session = function(self)
+addons.session = function(self)
 
     self:class("session", function(self, name, ...)
         if name == nil then
@@ -1027,7 +1114,7 @@ modules.session = function(self)
         self._id = id(self)
         self._name = name
         self._args = list(...)
-        self._catch = catch_error
+        self:catch(catch_error)
         self.__class._objects[name] = self
     end)
 
@@ -1039,14 +1126,16 @@ modules.session = function(self)
     end
 
     session.catch = function(self, catch)
-        self._catch = catch
+        self._catch = function(...)
+            catch("(", self._name, ") ", ...)
+        end
         return self
     end
 
     return self
 end
 
-modules.chat = function(self)
+addons.chat = function(self)
 
     self:class("chat", function(self, chat_id, language_code)
         self._type = "chat"
@@ -1070,14 +1159,18 @@ modules.chat = function(self)
     local chat = self.chat
 
     chat.send = function(self, name, ...)
-        send(self, self._chat_id, name, ...)
+        send_object(self, self._chat_id, self._language_code, name, ...)
         return self
     end
 
-    chat.print = function(self, value)
-        self.__class:send_compose({
+    chat.print = function(self, ...)
+        local texts = {}
+        for index = 1, select("#", ...) do
+            texts[#texts + 1] = text(self, (select(index, ...)))
+        end
+        self.__class:send_message({
             chat_id = self._chat_id,
-            value = text(self, value)
+            text = table.concat(texts, "\n")
         })
         return self
     end
@@ -1150,10 +1243,10 @@ function lru:get(key)
     return value
 end
 
-local luagram = {}
+local Luagram = {}
 
-function luagram.new(options)
-    local self = setmetatable({}, luagram)
+function Luagram.new(options)
+    local self = setmetatable({}, Luagram)
 
     if type(options) == "string" then
         options = {
@@ -1167,19 +1260,23 @@ function luagram.new(options)
     self._ids = 0
     self._objects = {}
     self._events = {}
-    self._users = lru.new(self.options.cache or 1024)
+    self._users = lru.new(options.cache or 1024)
     self._actions = {}
     self._catch = catch_error
     self.__class = self
+    
+    self._token = options.token
 
-    self:module("compose")
-    self:module("session")
-    self:module("chat")
+    self:addon("compose")
+    self:addon("session")
+    self:addon("chat")
+
+    self:on_unhandled(stdout)
 
     return self
 end
 
-function luagram:class(name, new, index)
+function Luagram:class(name, new, index)
     local class = {}
     class.__index = index or class
     self[name] = setmetatable({}, {
@@ -1189,14 +1286,14 @@ function luagram:class(name, new, index)
             self.__class = base
             return (new and new(self, ...)) or self
         end,
-        __index = class, -- function(_, key) return class[key] end,
-        __newindex = class -- function(_, key, value) class[key] = value end
+        __index = class,
+        __newindex = class
     })
     return self
 end
 
-function luagram:__index(key)
-    local value = rawget(luagram, key)
+function Luagram:__index(key)
+    local value = rawget(Luagram, key)
     if value == nil then
         local event = string.match(key, "^on_(%w+)$")
         if event then
@@ -1204,46 +1301,47 @@ function luagram:__index(key)
                 self._events[event] = callback
                 return self
             end
-        end
-        return function(self, data, multipart)
-            return telegram(self, key, data, multipart)
+        elseif not string.match(key, "^_") then
+            return function(self, data, multipart)
+                return telegram(self, key, data, multipart)
+            end
         end
     end
     return value
 end
 
-function luagram:module(name, ...)
-    if modules[name] then
-        return modules[name](self, ...) or self
+function Luagram:addon(name, ...)
+    if addons[name] then
+        return addons[name](self, ...) or self
     end
     local path = package.path
-    package.path = "./modules/?.lua;" .. path
-    local ok, module = pcall(require, name)
+    package.path = "./addons/?.lua;" .. path
+    local ok, addon = pcall(require, name)
     package.path = path
     if not ok then
-        error("module '" .. name .. "' not found")
+        error("addon '" .. name .. "' not found")
     end
-    return module(self, ...) or self
+    return addon(self, ...) or self
 end
 
-function luagram:locales(locales)
+function Luagram:locales(locales)
 
     if type(locales) == "string" then
         local path = package.path
         package.path = "./locales/?.lua;" .. path
-        local ok, module = pcall(require, locales)
+        local ok, addon = pcall(require, locales)
         package.path = path
         if not ok then
-            error("module '" .. locales .. "' not found")
+            error("addon '" .. locales .. "' not found")
         end
-        locales = module
+        locales = addon
     end
 
     self._locales = locales
     return self
 end
 
-function luagram:on(callback)
+function Luagram:on(callback)
     self._events[true] = callback
     return self
 end
@@ -1252,7 +1350,7 @@ local function callback_query(self, chat_id, language_code, update_data)
 
     local data = update_data.data
 
-    if not data:match("^luagram_action_%d+_%d+_%d+$") then
+    if not data:match("^Luagram_action_%d+_%d+_%d+$") then
         return false
     end
 
@@ -1307,6 +1405,10 @@ local function callback_query(self, chat_id, language_code, update_data)
         chat:send(...)
         return self
     end
+    
+    this.update = function(self)
+        return self._update_data, self._update_type
+    end
 
     this.this = function(self)
         for index = 1, #self do
@@ -1316,16 +1418,6 @@ local function callback_query(self, chat_id, language_code, update_data)
             end
         end
         return nil
-    end
-
-    this.redaction = function(self, label, action, ...)
-        local this = self:this()
-        label = label or this.label
-        action = action or this.action
-        local args = select("#", ...) > 0 and list(...) or this.args
-        self:remove(this.index)
-        self:action(this.index, label, action, args)
-        return self
     end
 
     this.clear = function(self, _type) -- luacheck: ignore
@@ -1369,7 +1461,8 @@ local function callback_query(self, chat_id, language_code, update_data)
     local _ = (function(ok, result, ...)
 
         if not ok then
-            error(result)
+            action.compose._catch(result)
+            return
         end
 
         if result == true then
@@ -1382,17 +1475,14 @@ local function callback_query(self, chat_id, language_code, update_data)
                 if object._type == "compose" then
                     this = object:clone()
                 elseif  object._type == "session" then
-                    --call session
-                    --remove keyboard
-                    --pssar os args
-                    for _, value in pairs(action.compose.interactions) do
-                        user.actions[value] = nil
+                    for _, value in pairs(action.interactions) do
+                        user.interactions[value] = nil
                     end
                     self.__class:edit_message_reply_markup({
                         chat_id = chat_id,
-                        message_id = update_data.message_id
+                        message_id = update_data.message.message_id
                     })
-                    send(self, chat_id, object._name, ...)
+                    send_object(self, chat_id, language_code, object._name, unlist(select("#", ...) > 0 and list(...) or action.args))
                     return
                 else
                    error("invalid object")
@@ -1401,14 +1491,14 @@ local function callback_query(self, chat_id, language_code, update_data)
                 error("object not found")
             end
         elseif type(result) == "table" and result._type == "session" then
-            for _, value in pairs(action.compose.interactions) do
-                user.actions[value] = nil
+            for _, value in pairs(action.interactions) do
+                user.interactions[value] = nil
             end
             self.__class:edit_message_reply_markup({
                 chat_id = chat_id,
-                message_id = update_data.message_id
+                message_id = update_data.message.message_id
             })
-            send(self, chat_id, result._name, ...)
+            send_object(self, chat_id, language_code, result._name, unlist(select("#", ...) > 0 and list(...) or action.args))
             return
         elseif type(result) == "table" and result._type == "compose" then
             this = result
@@ -1418,38 +1508,20 @@ local function callback_query(self, chat_id, language_code, update_data)
             error("invalid result")
         end
 
-        --com o result, realizar a mensagem_parse aqui
-        --olhar a mensagem original e a parseada
-        -- havendo incompatibilidadde
-        --enviar uma mensagem nova (algumas resultados devem remover o teclado da original aidna)
-        -- qunadose remove o teclado
-        --para limpar a memoria
-        -- o correto é remover as interactions da mensagem antiga tambem
-        --as interactiosnda mensagem é obtida via mensagem_antiga.interactions
-
-        -- compose_parse.
-        -- edit current compose
-
-        --necessário fazer um loop em action.interactions
-        --cada key deve remover o action user.actions[...] = nil
-        --caso a mensagem antiga precise for alterada
-        --ou seja, chegue até aqui
-
         if action.compose._transaction then
-            --mensagem antiga é uma transaction
-            --não pode ser alterada
-            --enviar uma nova mensagem aqui
 
-            --verificar se é possível alterar o teclado ainda
-            --acredito que não
-            for _, value in pairs(action.compose.interactions) do
-                user.actions[value] = nil
+            for _, value in pairs(action.interactions) do
+                user.interactions[value] = nil
             end
-            self.__class:edit_message_reply_markup({
+            local ok, message = self.__class:edit_message_reply_markup({
                 chat_id = chat_id,
-                message_id = update_data.message_id
+                message_id = update_data.message.message_id
             })
-            send(self, chat_id, this._name, ...)
+            if not ok then
+                action.compose._catch(message)
+                return
+            end
+            send_object(self, chat_id, language_code, this._name, unlist(select("#", ...) > 0 and list(...) or action.args))
 
             --nesse caso se a transaction possuir teclado, o que fazer??
             --inutilizar (action.transactions???)
@@ -1462,51 +1534,93 @@ local function callback_query(self, chat_id, language_code, update_data)
             end
 
             if action.compose._media ~= this._media then
-                self.__class:edit_message_media({
+                local ok, message = self.__class:edit_message_media({
                     chat_id = chat_id,
-                    message_id = this.message_id,
+                    message_id = update_data.message.message_id,
                     media = this._media
                 })
+                if not ok then
+                    action.compose._catch(message)
+                    return
+                end
             end
 
         elseif not action.compose._media and this._media then
             --remover os botões da mensagem antiga
             --enviar uma nova mensagem
-            for _, value in pairs(action.compose.interactions) do
-                user.actions[value] = nil
+            for _, value in pairs(action.interactions) do
+                user.interactions[value] = nil
             end
-            self.__class:edit_message_reply_markup({
+            local ok, message = self.__class:edit_message_reply_markup({
                 chat_id = chat_id,
-                message_id = update_data.message_id
+                message_id = update_data.message.message_id
             })
-            send(self, chat_id, this._name, ...)
+            if not ok then
+                action.compose._catch(message)
+                return
+            end
+            send_object(self, chat_id, language_code, this._name, unlist(select("#", ...) > 0 and list(...) or action.args))
 
             return
         end
 
-        for _, value in pairs(action.compose.interactions) do
-            user.actions[value] = nil
+        for _, value in pairs(action.interactions) do
+            user.interactions[value] = nil
         end
+        
+--        print("antes")
+--        for k,v in pairs(this) do 
+--            print(k,v)
+--            if type(v) =="table" then
+--                for k2,v2 in pairs(v) do 
+--                    print(" "," ",k2, v2) 
+--                end
+--            end
+--        end
 
-        local compose = compose_parse(chat, this, ...)
+        local compose = parse_compose(chat, this, unlist(select("#", ...) > 0 and list(...) or action.args))
+
+--        print("depois")
+--        for k,v in pairs(compose) do 
+--            print(k,v)
+--            if type(v) =="table" then
+--                for k2,v2 in pairs(v) do 
+--                    print(" "," ",k2, v2) 
+--                end
+--            end
+--        end
+
+        local ok, message
+        
+        if not compose then
+            action.compose._catch("parser error")
+            return
+        end
 
         if this._method == "message" then
-            self.__class:edit_message_caption({
+            print("aqui", require("json").encode(update_data))
+            ok, message = self.__class:edit_message_text({
                 chat_id = chat_id,
-                message_id = update_data.message_id,
+                message_id = update_data.message.message_id,
                 text = compose._output.text,
-                reply_keyboard = compose._output.reply_keyboard
+                parse_mode = compose._output.parse_mode,
+                reply_markup = compose._output.reply_markup
             })
         else
-            self.__class:edit_message_text({
+            ok, message = self.__class:edit_message_caption({
                 chat_id = chat_id,
-                message_id = update_data.message_id,
+                message_id = update_data.message.message_id,
                 caption = compose._output.caption,
-                reply_keyboard = compose._output.reply_keyboard
+                parse_mode = compose._output.parse_mode,
+                reply_markup = compose._output.reply_markup
             })
         end
+        
+        if not ok then
+            action.compose._catch(message)
+        end
 
-    end)(pcall(action.action, this, unlist(action.args))) -- unlist(select("#", ...) > 0 and list(...) or action.args)
+    end)(pcall(action.action, this, unlist(action.args)))
 
     action.lock = false
 
@@ -1523,7 +1637,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
 
     local payload = update_data.invoice_payload
 
-    if not payload:match("^luagram_transaction_%d+_%d+_%d+$") then
+    if not payload:match("^Luagram_transaction_%d+_%d+_%d+$") then
         return false
     end
 
@@ -1535,16 +1649,20 @@ local function shipping_query(self, chat_id, language_code, update_data)
 
     local transaction = user.interactions[payload]
 
-    local catch = transaction.compose.catch
-
     if not transaction then
         return false
     end
+    
+    local catch = transaction.compose._catch
 
     local this = self:chat(chat_id, language_code)
 
     this.status = function()
         return "shipping"
+    end
+    
+    this.payload = function()
+        return update_data, "shipping_query"
     end
 
     local _ = (function(ok, ...)
@@ -1555,7 +1673,8 @@ local function shipping_query(self, chat_id, language_code, update_data)
                 ok = false,
                 error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
             })
-            return catch(string.format("error on proccess shipping query: %s", ...))
+            catch(string.format("error on proccess shipping query: %s", ...))
+            return
         end
 
         local result = ...
@@ -1589,7 +1708,8 @@ local function shipping_query(self, chat_id, language_code, update_data)
                         ok = false,
                         error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
                     })
-                    return catch(string.format("error on proccess shipping query: invalid return value"))
+                    catch(string.format("error on proccess shipping query: invalid return value"))
+                    return
                 end
             end
             self.__class:answer_shipping_query({
@@ -1604,10 +1724,11 @@ local function shipping_query(self, chat_id, language_code, update_data)
                 ok = false,
                 error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
             })
-            return catch(string.format("error on proccess shipping query: invalid return value"))
+            catch(string.format("error on proccess shipping query: invalid return value"))
+            return
         end
 
-    end)(pcall(transaction.transaction, this, unlist(transaction.args))) -- unlist(select("#", ...) > 0 and list(...) or action.args)
+    end)(pcall(transaction.transaction, this, unlist(transaction.args)))
 
 end
 
@@ -1615,7 +1736,7 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
 
     local payload = update_data.invoice_payload
 
-    if not payload:match("^luagram_transaction_%d+_%d+_%d+$") then
+    if not payload:match("^Luagram_transaction_%d+_%d+_%d+$") then
         return false
     end
 
@@ -1627,7 +1748,7 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
 
     local transaction = user.interactions[payload]
 
-    local catch = transaction.compose.catch
+    local catch = transaction.compose._catch
 
     if not transaction then
         return false
@@ -1638,6 +1759,10 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
     this.status = function()
         return "review"
     end
+    
+    this.payload = function()
+        return update_data, "pre_checkout_query"
+    end
 
     local _ = (function(ok, ...)
 
@@ -1647,7 +1772,8 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
                 ok = false,
                 error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
             })
-            return catch(string.format("error on proccess pre checkout query: %s", ...))
+            catch(string.format("error on proccess pre checkout query: %s", ...))
+            return
         end
 
         local result = ...
@@ -1676,10 +1802,11 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
                 ok = false,
                 error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
             })
-            return catch(string.format("error on proccess pre checkout query: invalid return value"))
+            catch(string.format("error on proccess pre checkout query: invalid return value"))
+            return
         end
 
-    end)(pcall(transaction.transaction, this, unlist(transaction.args))) -- unlist(select("#", ...) > 0 and list(...) or action.args)
+    end)(pcall(transaction.transaction, this, unlist(transaction.args))) 
 
 end
 
@@ -1687,7 +1814,7 @@ local function successful_payment(self, chat_id, language_code, update_data)
 
     local payload = update_data.successful_payment.invoice_payload
 
-    if not payload:match("^luagram_transaction_%d+_%d+_%d+$") then
+    if not payload:match("^Luagram_transaction_%d+_%d+_%d+$") then
         return false
     end
 
@@ -1708,31 +1835,28 @@ local function successful_payment(self, chat_id, language_code, update_data)
     this.status = function()
         return "complete"
     end
+    
+    this.payload = function()
+        return update_data, "successful_payment"
+    end
 
-    pcall(transaction.transaction, this, unlist(transaction.args)) -- unlist(select("#", ...) > 0 and list(...) or action.args)
+    pcall(transaction.transaction, this, unlist(transaction.args))
 
     return true
 end
 
 local function chat_id(update_data, update_type)
     if update_type == "callback_query" then
-        return update_data.compose.chat.id, update_data.compose.from.language_code
+        return update_data.message.chat.id, update_data.message.from.language_code
     end
-    return update_data.chat.id, update_data.from.language_code
+    return assert(update_data.chat.id, "chat_id not found"), update_data.from.language_code
 end
 
-function luagram:update(update)
-    -- obter o autor do dona do update
-    -- verificar se o update não é um callback data query
-    -- verificar se o update não é um comando
-    -- verificar se o autor da menesagem posasui sessão aberta já
-    -- caso não haja, ir para o entry point (se houver)
-    -- caso não seja processado, enviar aos events
-
+local function parse_update(self, update)
     local update_type, update_data
 
     assert(type(update) == "table", "invalid update")
-    assert(not update.update_id, "invalid update")
+    assert(update.update_id, "invalid update")
 
     for key, value in pairs(update) do
         if key ~= "update_id" then
@@ -1745,6 +1869,8 @@ function luagram:update(update)
     if not update_type or not update_data then
         error("invalid update")
     end
+    
+    local user = self._users:get(id)
 
     local chat_id, language_code = chat_id(update_data, update_type)
 
@@ -1752,23 +1878,54 @@ function luagram:update(update)
 
         -- se retornar true, significa que foi handled já
         -- se retornar false ou nil, significa que não foi
-        if callback_query(self, chat_id, update_data) == true then
-            return
+        if callback_query(self, chat_id, language_code, update_data) == true then
+            return self
         end
 
-        local event = string.match(update_data.data, "^luagram_event_(%w+)$")
+        local event, arg = string.match(update_data.data, "^Luagram_event_(%w+)_?(%d*)$")
 
-        if event and self._events[event] then
-            if self._events[event](update) ~= false then
-                return
+        if event then
+            
+            if arg == "" then
+                arg = nil
             end
+
+            self.__class:answer_callback_query({
+                callback_query_id = update_data.id
+            })
+            
+            print("é evento", event)
+            if self._events[event] and self._events[event](update_data, arg) ~= false then
+                print("aqui1")
+                return self
+            end
+
+            if self._events[true] then
+                print("aqui2")
+                self._events[true](update_data, arg)
+                return self
+            end
+            
+            if self._events.unhandled then
+                self._events.unhandled(update._response)
+                return self
+            end
+
+            print("aqui3")
+            error(string.format("unhandled update: %s", update._response))
+            return self
+
         end
 
-        if string.match(update_data.data, "^luagram_action_%d+_%d+_%d+$") then
+        local time = string.match(update_data.data, "^Luagram_action_%d+_%d+_(%d+)$")
+        if time and (not user or tonumber(time) < user.created_at) then
             self.__class:answer_callback_query({
                 callback_query_id = update_data.id,
                 text = text(self:chat(chat_id, language_code), {"Welcome back! This message is outdated. Let's start over!"})
             })
+            if send_object(self, chat_id, language_code, "/start", false) == true then
+                return self
+            end
         end
 
         -- aqui deve -se verificar se o callback_query é o formato do luagram
@@ -1781,91 +1938,93 @@ function luagram:update(update)
     elseif update_type == "shipping_query" then
 
         if shipping_query(self, chat_id, update_data) == true then
-            return
+            return self
         end
 
-        if string.match(update_data.invoice_payload, "^luagram_transaction_%d+_%d+_%d+$") then
+        if string.match(update_data.invoice_payload, "^Luagram_transaction_%d+_%d+_%d+$") then
             self.__class:answer_shipping_quer({
                 shipping_query_id = update_data.id,
                 ok = false,
                 error_message = text(self:chat(chat_id, language_code), {"Unfortunately, there was an issue while completing this payment."})
             })
-            return
+            return self
         end
 
     elseif update_type == "pre_checkout_query" then
 
         if pre_checkout_query(self, chat_id, update_data) == true then
-            return
+            return self
         end
 
-        if string.match(update_data.invoice_payload, "^luagram_transaction_%d+_%d+_%d+$") then
+        if string.match(update_data.invoice_payload, "^Luagram_transaction_%d+_%d+_%d+$") then
             self.__class:answer_pre_checkout_query({
                 pre_checkout_query_id = update_data.id,
                 ok = false,
                 error_message = text(self:chat(chat_id, language_code), {"Unfortunately, it wasn't possible to complete this payment. Please start the process again in the bot."})
             })
-            return
+            return self
         end
 
-    elseif update_type == "compose" and update_data.successful_payment  then
+    elseif update_type == "message" and update_data.successful_payment  then
 
         if successful_payment(self, chat_id, update_data) == true then
-            return
+            return self
         end
 
-        if string.match(update_data.invoice_payload, "^luagram_transaction_%d+_%d+_%d+$") then
-            return
+        if string.match(update_data.invoice_payload, "^Luagram_transaction_%d+_%d+_%d+$") then
+            return self
         end
 
     end
 
-    local user = self._users:get(id)
-
     if not user then
-        self._users:get(id, {
+        self._users:set(id, {
+            created_at = os.time(),
             interactions = {}
         })
+        user = self._users:get(id)
     end
 
     local thread = user.thread
 
-    if coroutine.status(thread.main) ~= "suspended" then
-        user.thread = nil
-    else
+    if thread then
+        if coroutine.status(thread.main) ~= "suspended" then
+            user.thread = nil
+        else
 
-        local result
-        local valid = true
-        if thread.match then
-            valid = false
-            local _ = (function(ok, ...)
+            local result
+            local valid = true
+            if thread.match then
+                valid = false
+                local _ = (function(ok, ...)
+                    if not ok then
+                        thread.object._catch(string.format("error on match session thread: %s", ...))
+                        return
+                    end
+                    if select("#", ...) > 0 then
+                        valid = true
+                        result = list(...)
+                    end
+                end)(pcall(thread.main, update))
+            end
+
+            if valid then
+
+                local ok, err = coroutine.resume(thread.main, unlist(result or list(update)))
+
                 if not ok then
-                    thread.object:catch(string.format("error on match session thread (%s): %s", thread.object._name, ...))
-                    return
+                    thread.object._catch(string.format("error on execute main session thread : %s", err))
+                    return self
                 end
-                if select("#", ...) > 0 then
-                    valid = true
-                    result = list(...)
+
+                if coroutine.status(thread.main) == "dead" then
+                    user.thread = nil
                 end
-            end)(pcall(thread.main, update))
-        end
 
-        if valid then
-
-            local ok, err = coroutine.resume(thread.main, unlist(result or list(update)))
-
-            if not ok then
-                thread.object:catch(string.format("error on execute main session thread (%s): %s", thread.object._name, err))
-                return
             end
 
-            if coroutine.status(thread.main) == "dead" then
-                user.thread = nil
-            end
-
+            return self
         end
-
-        return
     end
 
 
@@ -1873,7 +2032,7 @@ function luagram:update(update)
     --testar e continuar caso esteja
 
     --vertificar se não é comando
-    if update_type == "compose" then
+    if update_type == "message" then
 
         local text = update_data.text
 
@@ -1881,44 +2040,67 @@ function luagram:update(update)
 
         if command and (space == " " or space == "") then
 
-            if send(self, chat_id, command, payload) == true then
+            if send_object(self, chat_id, language_code, command, payload) == true then
                 -- se a função send retoirnar true significa que foi enviado com sucesso
                 -- o comando existe
-                return
+                return self
             end
 
         end
+    
+    
+        --0 nada foi processado até aqui
+        --chamar o entry point se haver
 
-    end
+        if send_object(self, chat_id, language_code, "/start", false) == true then
+            -- se a função send retoirnar true significa que foi enviado com sucesso
+            -- entry point existe
+            return self
+        end
 
-    --0 nada foi processado até aqui
-    --chamar o entry point se haver
-
-    if send(self, chat_id, language_code, "/start", false) == true then
-        -- se a função send retoirnar true significa que foi enviado com sucesso
-        -- entry point existe
-        return
     end
 
     -- aqui deve ser chamado o evento pois não foi encontrado nada para processar
 
     if self._events[update_type] then
         if self._events[update_type](update) ~= false then
-            return
+            return self
         end
     end
 
     if self._events[true] then
         self._events[true](update)
-        return
+        return self
+    end
+    
+    if self._events.unhandled then
+        self._events.unhandled(update._response)
+        return self
     end
 
     -- aqui deve chamar a função catch, pois não foi capaturado o update
     -- odefault da função catch é a função error
-    if self._catch then
-        self._catch("unhandled", update)
-        return
-    end
+
+    error(string.format("unhandled update: %s", update._response))
+end
+
+function Luagram:update(update)
+    -- obter o autor do dona do update
+    -- verificar se o update não é um callback data query
+    -- verificar se o update não é um comando
+    -- verificar se o autor da menesagem posasui sessão aberta já
+    -- caso não haja, ir para o entry point (se houver)
+    -- caso não seja processado, enviar aos events
+
+
+    xpcall(function()
+        
+        if type(update) ~= "table" then
+            error(string.format("invalid update: %s", update))
+        end
+
+        parse_update(self, update)
+    end, self._catch)
 
     -- aqui deve acontecer um erro
 
@@ -1940,34 +2122,35 @@ function luagram:update(update)
     return self
 end
 
-function luagram:start()
+function Luagram:updates(stop)
+    if stop == false then
+        self._stop = true
+        return self
+    end
     local offset
     while true do
         if self._stop then
             self._stop = nil
             break
         end
-        local result = self:get_updates({
+        local result, err = self:get_updates({
             offset = offset
         })
         if result then
-            for _, update in pairs(result) do
-                if not offset or update.update_id > offset then
-                    offset = update.update_id
-                end
+            for index = 1, #result do
+                local update = result[index]
+                update._response = result._response
+                offset = update.update_id + 1
                 self:update(update)
             end
+        else
+            self._catch(err)
         end
     end
     return self
 end
 
-function luagram:stop()
-    self._stop = true
-    return self
-end
-
-return setmetatable(luagram, {
+return setmetatable(Luagram, {
   __call = function(self, ...)
       return self.new(...)
   end

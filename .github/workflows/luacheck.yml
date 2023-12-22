@@ -25,4 +25,4 @@ jobs:
         run: luarocks install luacheck
 
       - name: Run ‘luacheck’
-        run: luacheck --no-redefined --no-self --max-line-length 200 luagram.lua
+        run: luacheck --no-redefined --no-self --max-line-length 200 Luagram.lua

@@ -212,6 +212,7 @@ describe("button", function()
                     },
                     id = "622150475951426722",
                 })
+                print("--->", argument, type(argument))
                 assert.True(argument == 100)
             end)
 

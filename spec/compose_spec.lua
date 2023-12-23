@@ -135,4 +135,63 @@ describe("compose", function()
 
         end)
 
+
+        it("runtime order", function()
+
+            local bot  = new()
+
+            bot:compose("/test")
+            :run(function(self)
+                self:run(function(self)
+                    self:text("1")
+                end):text("2")
+            end):text("3"):run(function(self)
+                self:text("4")
+            end):run(function(self)
+                self:text("5"):text(1, "error")
+            end):text("6"):run(function(self)
+            end):text("7"):run(function(self)
+                self:run(function(self)
+                    self:text("8")
+                end):text("9")
+            end)
+
+            test(bot, {
+                update_id = 842537828,
+                message = {
+                    message_id = 1341,
+                    entities = {
+                        {
+                            type = "bot_command",
+                            length = 5,
+                            offset = 0,
+                        },
+                    },
+                    date = 1703357761,
+                    from = {
+                        is_bot = false,
+                        first_name = "Lua",
+                        id = 101010101,
+                        last_name = "gram",
+                        language_code = "en",
+                        username = "Luagram",
+                    },
+                    chat = {
+                        first_name = "Lua",
+                        id = 101010101,
+                        type = "private",
+                        username = "Luagram",
+                        last_name = "gram",
+                    },
+                    text = "/test",
+                },
+            },
+            function(r) assert.are.same(r, {
+                chat_id = 101010101,
+                parse_mode = "HTML",
+                text = "123456789",
+            }) end)
+
+        end)
+
 end)

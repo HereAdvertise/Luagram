@@ -28,7 +28,7 @@ describe("button", function()
 
             bot:on_ok(function(update)
                 assert.are.same(update, {
-                    data = "Luagram_event_ok",
+                    data = "Luagram_event_ok1",
                     chat_instance = "-6184452786735168277",
                     from = {
                         is_bot = false,

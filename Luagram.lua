@@ -1939,6 +1939,8 @@ local function parse_update(self, update)
 
             if arg == "" then
                 arg = nil
+            else
+                arg = tonumber(arg)
             end
 
             self.__class:answer_callback_query({

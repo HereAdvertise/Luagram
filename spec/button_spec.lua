@@ -212,7 +212,6 @@ describe("button", function()
                     },
                     id = "622150475951426722",
                 })
-                print("--->", argument, type(argument))
                 assert.True(argument == 100)
             end)
 
@@ -265,7 +264,7 @@ describe("button", function()
             test(bot, {
                 update_id = 842537833,
                 callback_query = {
-                    data = "Luagram_event_ok",
+                    data = "Luagram_event_ok_100",
                     chat_instance = "-6184452786735168277",
                     from = {
                         is_bot = false,

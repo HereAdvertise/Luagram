@@ -273,6 +273,8 @@ end
 local function parse_compose(chat, compose, ...)
     -- é muito simples parsear uma mensagem
     --essa função de sex executada com pcall?
+    
+    print("entrou no compose parser@@@@@@")
 
     local users = chat.__class._users
 
@@ -311,20 +313,26 @@ local function parse_compose(chat, compose, ...)
     end
 
     local index = 1
+    print("entrou no loop")
     while index <= #compose do
         local item = compose[index]
-        if type(item) == "table" and item._type then
-
+        if type(item) == "table" and item._type and item._indexed ~= compose._id then
+            item._indexed = compose._id
+print("index: ", index,item._type)
             -- runtime
             if item._type == "run" then
-                compose._index = index + 1
-                local _ = (function(ok, ...)
+
+                compose._runtime = index + 1
+                local err = (function(ok, ...)
                     if not ok then
                         compose._catch(...)
-                        return
+                        return ...
                     end
-                end)(pcall(item.value, chat, unlist(select("#", ...) > 0 and list(...) or compose.args)))
-                compose._index = nil
+                end)(pcall(item.run, compose, unlist(select("#", ...) > 0 and list(...) or compose.args)))
+                if err then
+                   return nil, err
+                end
+                compose._runtime = nil
 
             -- texts
             elseif item._type == "text" then
@@ -368,23 +376,23 @@ local function parse_compose(chat, compose, ...)
             elseif item._type == "link" then
                 close_tags()
                 texts[#texts + 1] = '<a href="'
-                texts[#texts + 1] = escape(item.href)
+                texts[#texts + 1] = escape(item.url)
                 texts[#texts + 1] = '">'
-                texts[#texts + 1] = escape(text(chat, item.value))
+                texts[#texts + 1] = escape(text(chat, item.label))
                 texts[#texts + 1] = "</a>"
             elseif item._type == "mention" then
                 close_tags()
-                texts[#texts + 1] = '<a href="tg://user?id='
+                texts[#texts + 1] = '<a href="'
                 texts[#texts + 1] = escape(item.user)
                 texts[#texts + 1] = '">'
-                texts[#texts + 1] = escape(text(chat, item.value))
+                texts[#texts + 1] = escape(text(chat, item.name))
                 texts[#texts + 1] = "</a>"
             elseif item._type == "emoji" then
                 close_tags()
                 texts[#texts + 1] = '<tg-emoji emoji-id="'
-                texts[#texts + 1] = escape(item.value)
+                texts[#texts + 1] = escape(item.emoji)
                 texts[#texts + 1] = '">'
-                texts[#texts + 1] = escape(text(chat, item.emoji))
+                texts[#texts + 1] = escape(text(chat, item.placeholder))
                 texts[#texts + 1] = "</tg-emoji>"
             elseif item._type == "mono" then
                 close_tags()
@@ -402,17 +410,15 @@ local function parse_compose(chat, compose, ...)
                     texts[#texts + 1] = '<pre><code class="language-'
                     texts[#texts + 1] = escape(item.language)
                     texts[#texts + 1] = '">'
-                    texts[#texts + 1] = escape(text(chat, item.value))
+                    texts[#texts + 1] = escape(text(chat, item.code))
                 else
                     texts[#texts + 1] = "<pre><code>"
-                    texts[#texts + 1] = escape(text(chat, item.value))
+                    texts[#texts + 1] = escape(text(chat, item.code))
                 end
                 texts[#texts + 1] = "</code></pre>"
             elseif item._type == "line" then
                 if item.value then
-                    if texts[#texts] ~= "\n" then
-                        texts[#texts + 1] = "\n"
-                    end
+                    texts[#texts + 1] = "\n"
                     texts[#texts + 1] = escape(text(chat, item.value))
                 end
                 close_tags()
@@ -855,7 +861,7 @@ addons.compose = function(self)
         local clone = self.__class:compose(false)
         for key, value in pairs(self) do
             if key ~= "_id" and key ~= "__class" then
-                if type(value) == "table" then
+                if type(value) == "table" and not value._runtime then
                     local copy = {}
                     for copy_key, copy_value in pairs(value) do
                         copy[copy_key] = copy_value
@@ -872,28 +878,34 @@ addons.compose = function(self)
         return clone
     end
 
-    local function insert(self, data)
-        if not self._index then
-            table.insert(self, data)
+    local function insert(self, index, data)
+        if not index then
+            if self._runtime then
+                data._runtime = true
+                for k,v in pairs(data) do print(k,v) end
+                table.insert(self, self._runtime, data)
+                self._runtime = self._runtime + 1
+            else
+                table.insert(self, data)
+            end
         else
-            table.insert(self, self._index, data)
+            table.insert(self, index, data)
         end
     end
 
     local function simple(_type, arg1) -- luacheck: ignore
         return function(self, ...)
             local index, value1 = ...
-            local _index = self._index
+            local _index
             if type(index) == "number" and select("#", ...) > 1 then
-                self._index = index
+                _index = index
             else
                 value1 = index
             end
-            insert(self, {
+            insert(self, _index, {
                 _type = _type,
                 [arg1] = value1
             })
-            self._index = _index
             return self
         end
     end
@@ -901,19 +913,18 @@ addons.compose = function(self)
     local function multiple(_type, arg1, arg2) -- luacheck: ignore
         return function(self, ...)
             local index, value1, value2 = ...
-            local _index = self._index
+            local _index
             if type(index) == "number" and select("#", ...) > 1 then
-                self._index = index
+                _index = index
             else
                 value2 = value1
                 value1 = index
             end
-            insert(self, {
+            insert(self, _index, {
                 _type = _type,
                 [arg1] = value1,
                 [arg2] = value2
             })
-            self._index = _index
             return self
         end
     end
@@ -929,46 +940,86 @@ addons.compose = function(self)
 
     compose.run = simple("run", "run")
 
-    compose.link = multiple("link", "label", "url")
+    compose.link = function(self, ...)
+        local index, label, url = ...
+        local _index
+        if type(index) == "number" and select("#", ...) > 1 then
+            _index = index
+        else
+            url = label
+            label = index
+        end
+        if url == nil then
+            url = label
+        end
+        insert(self, _index, {
+            _type = "link",
+            url = url,
+            label = label,
+        })
+        return self
+    end
 
-    compose.mention = multiple("mention", "user", "id")
+    compose.mention = function(self, ...)
+        local index, user, name = ...
+        local _index
+        if type(index) == "number" and select("#", ...) > 1 then
+            _index = index
+        else
+            name = user
+            user = index
+        end
+        if tonumber(user) then
+            user = string.format("tg://user?id=%s", user)
+        else
+            if not name then
+                name = user
+            end
+            user = string.format("https://t.me/%s", user)
+        end
+        insert(self, _index, {
+            _type = "mention",
+            user = user,
+            name = name,
+        })
+        return self
+    end
 
     compose.emoji = multiple("emoji", "emoji", "placeholder")
 
     compose.code = function(self, ...)
         local index, language, code = ...
-        local _index = self._index
+        local _index
         if type(index) == "number" and select("#", ...) > 1 then
-            self._index = index
+            _index = index
         else
             code = language
             language = index
         end
         if code == nil then
             code = language
+            language = nil
         end
-        insert(self, {
+        insert(self, _index, {
             _type = "code",
             code = code,
             language = language,
         })
-        self._index = _index
         return self
     end
 
     compose.line = function(self, ...)
         local index, line = ...
-        local _index = self._index
+        local _index
         if type(index) == "number" then
-            self._index = index
+            _index = index
         else
             line = index
         end
-        insert(self, {
+        insert(self, _index, {
             _type = "line",
             value = line
         })
-        self._index = _index
         return self
     end
 
@@ -984,9 +1035,9 @@ addons.compose = function(self)
 
     compose.button = function(self, ...)
         local index, label, event, arg = ...
-        local _index = self._index
+        local _index
         if type(index) == "number" and select("#", ...) > 1 then
-            self._index = index
+            _index = index
         else
             arg = event
             event = label
@@ -1001,57 +1052,54 @@ addons.compose = function(self)
                 error(string.format("invalid argument: %s", arg))
             end
         end
-        insert(self, {
+        insert(self, _index, {
             _type = "button",
             label = label,
             event = event,
             arg = arg
         })
-        self._index = _index
         return self
     end
 
     compose.action = function(self, ...)
         local index, label, action = ...
-        local _index = self._index
+        local _index
         if type(index) == "number" and select("#", ...) > 1 then
-            self._index = index
+            _index = index
         else
             action = label
             label = index
         end
-        insert(self, {
+        insert(self, _index, {
             _type = "action",
             label = label,
             action = action
         })
-        self._index = _index
         return self
     end
 
     compose.location = function(self, ...)
         local index, label, location = ...
-        local _index = self._index
+        local _index
         if type(index) == "number" and select("#", ...) > 1 then
-            self._index = index
+            _index = index
         else
             location = label
             label = index
         end
-        insert(self, {
+        insert(self, _index, {
             _type = "location",
             label = label,
             location = location
         })
-        self._index = _index
         return self
     end
 
     compose.transaction = function(self, ...)
         local index, label, transaction = ...
-        local _index = self._index
+        local _index
         if type(index) == "number" and select("#", ...) > 1 then
-            self._index = index
+            _index = index
         else
             transaction = label
             label = index
@@ -1060,25 +1108,23 @@ addons.compose = function(self)
             transaction = label
             label = false
         end
-        insert(self, {
+        insert(self, _index, {
             _type = "transaction",
             label = label,
             transaction = transaction
         })
-        self._index = _index
         return self
     end
 
     compose.row = function(self, ...)
         local index = ...
-        local _index = self._index
+        local _index
         if type(index) == "number" then
-            self._index = index
+            _index = index
         end
-        insert(self, {
+        insert(self, _index, {
             _type = "row"
         })
-        self._index = _index
         return self
     end
 

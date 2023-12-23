@@ -1937,18 +1937,19 @@ local function parse_update(self, update)
 
         if event then
 
+            print("é evento", event, arg, type(arg))
+
             if arg == "" then
                 arg = nil
             else
                 arg = tonumber(arg)
             end
 
-
             self.__class:answer_callback_query({
                 callback_query_id = update_data.id
             })
 
-            print("é evento", event, arg, type(arg))
+            
             if self._events[event] and self._events[event](update_data, arg) ~= false then
                 print("aqui1")
                 return self

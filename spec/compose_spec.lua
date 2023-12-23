@@ -127,10 +127,10 @@ describe("compose", function()
                     text = "/start text from command",
                 },
             },
-            function(r) assert.are.same(r, 
+            function(r) assert.are.same(r, {
                 chat_id = 101010101,
                 parse_mode = "HTML",
-                text = "begin\nstart\nescape test &lt;&gt;&quot;&amp;\n\nline no blank line\n<b>bold</b>\n<i>italic</i>\n<u>underline</u>\n<tg-spoiler>spoiler</tg-spoiler>\n<s>strike</s>\n<b><u>\nbold + underline + line</u></b>\n<a href="https://with-label.com">with-label</a>\n<a href="https://no-label.com">https://no-label.com</a>\n<a href="https://t.me/user_with_username_and_name">User with username and name</a>\n<a href="https://t.me/user_only_username">user_only_username</a>\n<tg-emoji emoji-id="10101010">👋</tg-emoji>\n<code>mono</code>\n<pre>pre\n	pre\npre</pre>\n<pre><code class="language-lua">print('code in Lua')</code></pre>\n<pre><code>if not nil then print('code auto detect') end</code></pre>\n<b>raw html &amp;</b>\n<b><i>bold + italic</i></b>\n<b><i><u><s>bold + italic + underline + strike</s></u></i></b>\n<u><tg-spoiler>underline + spoiler</tg-spoiler></u>\ntext from command\nruntime line\nfinal",
+                text = "begin\nstart\nescape test &lt;&gt;&quot;&amp;\n\nline no blank line\n<b>bold</b>\n<i>italic</i>\n<u>underline</u>\n<tg-spoiler>spoiler</tg-spoiler>\n<s>strike</s>\n<b><u>\nbold + underline + line</u></b>\n<a href=\"https://with-label.com\">with-label</a>\n<a href=\"https://no-label.com\">https://no-label.com</a>\n<a href=\"https://t.me/user_with_username_and_name\">User with username and name</a>\n<a href=\"https://t.me/user_only_username\">user_only_username</a>\n<tg-emoji emoji-id=\"10101010\">👋</tg-emoji>\n<code>mono</code>\n<pre>pre\n	pre\npre</pre>\n<pre><code class=\"language-lua\">print('code in Lua')</code></pre>\n<pre><code>if not nil then print('code auto detect') end</code></pre>\n<b>raw html &amp;</b>\n<b><i>bold + italic</i></b>\n<b><i><u><s>bold + italic + underline + strike</s></u></i></b>\n<u><tg-spoiler>underline + spoiler</tg-spoiler></u>\ntext from command\nruntime line\nfinal",
             }) end)
 
         end)

@@ -1,9 +1,71 @@
 ---
-title: Usage
+title: Basic usage
 layout: default
 nav_order: 2
 ---
 
-This is a *bare-minimum* template to create a Jekyll site that uses the [Just the Docs] theme. You can easily set the created site to be published on [GitHub Pages] – the [README] file explains how to do that, along with other details.
+Below is an example of **Hello world**. This code is similar to what you find in other Telegram bot libraries. Luagram can do much more than that!
 
-If [Jekyll] is installed on your computer, you can also build and preview the created site *locally*. This lets you test changes before committing them, and avoids waiting for GitHub Pages.[^1] And you will be able to deploy your local build to a different platform than GitHub Pages.
+{: .lang .lua }
+```lua
+local Luagram = require("Luagram")
+
+local bot = Luagram.new("...your token from Botfather...")
+
+bot:on_message(function(message)
+    bot:send_message({
+        chat_id = message.chat.id,
+        text = "Hello World!"
+    })
+end)
+```
+
+{: .lang .lua_chain .hidden }
+```lua
+local Luagram = require("Luagram")
+
+Luagram("...your token from Botfather...")
+    :on_message(function(message)
+        bot:send_message({
+            chat_id = message.chat.id,
+            text = "Hello World!"
+        })
+    end)
+```
+
+{: .lang .moon .hidden }
+```moonscript
+Luagram = require "Luagram"
+
+bot = Luagram.new "...your token from Botfather..."
+
+bot\on_message (messsage) ->
+    bot\send_message
+        chat_id: message.chat.id,
+        text: "Hello World!"
+```
+
+{: .lang .moon_chain .hidden }
+```moonscript
+Luagram = require "Luagram"
+
+with Luagram "...your token from Botfather..."
+
+    \on_message (messsage) ->
+        \send_message
+           chat_id: message.chat.id,
+           text: "Hello World!"
+```
+
+<div class="tg">
+    <div class="tg-right">
+        <div>
+            <span>/start</span>
+        </div>
+    </div>
+    <div class="tg-left">
+        <div>
+            Hello World!
+        </div>
+    </div>
+</div>

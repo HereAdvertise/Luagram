@@ -273,7 +273,7 @@ end
 local function parse_compose(chat, compose, ...)
     -- é muito simples parsear uma mensagem
     --essa função de sex executada com pcall?
-    
+
     print("entrou no compose parser@@@@@@")
 
     local users = chat.__class._users
@@ -1949,7 +1949,7 @@ local function parse_update(self, update)
                 callback_query_id = update_data.id
             })
 
-            
+
             if self._events[event] and self._events[event](update_data, arg) ~= false then
                 print("aqui1")
                 return self

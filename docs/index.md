@@ -33,7 +33,12 @@ print "Moonscript (chain)"
 <div class="tg">
     <div class="tg-right">
         <div>
-            /start
+            <span>/start</span>
+        </div>
+    </div>
+    <div class="tg-right">
+        <div>
+            Message
         </div>
     </div>
     <div class="tg-left">

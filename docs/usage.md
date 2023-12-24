@@ -12,7 +12,7 @@ local Luagram = require("Luagram")
 
 local bot = Luagram.new("...your token from Botfather...")
 
-bot:on_message(function(self, message)
+bot:on_message(function(message)
     bot:send_message({
         chat_id = message.chat.id,
         text = "Hello World!"
@@ -24,13 +24,14 @@ end)
 ```lua
 local Luagram = require("Luagram")
 
-Luagram("...your token from Botfather...")
-    :on_message(function(self, message)
-        self:send_message({
-            chat_id = message.chat.id,
-            text = "Hello World!"
-        })
-    end)
+local bot = Luagram.new("...your token from Botfather...")
+
+bot:on_message(function(message)
+    bot:send_message({
+        chat_id = message.chat.id,
+        text = "Hello World!"
+    })
+end)
 ```
 
 {: .lang .moon .hidden }
@@ -39,7 +40,7 @@ Luagram = require "Luagram"
 
 bot = Luagram.new "...your token from Botfather..."
 
-bot\on_message (messsage) =>
+bot\on_message (messsage) ->
     bot\send_message
         chat_id: message.chat.id,
         text: "Hello World!"
@@ -49,9 +50,9 @@ bot\on_message (messsage) =>
 ```moonscript
 Luagram = require "Luagram"
 
-with Luagram "...your token from Botfather..."
+with Luagram.new "...your token from Botfather..."
 
-    \on_message (messsage) =>
+    \on_message (messsage) ->
         \send_message
            chat_id: message.chat.id,
            text: "Hello World!"

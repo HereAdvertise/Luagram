@@ -1,0 +1,38 @@
+name: Redbean
+
+on:
+  push:
+    branches: [ main ]
+    tags: 'v*.*.*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Release
+    runs-on: ubuntu-latest
+    #if: startsWith(github.ref, 'refs/tags/') || !contains(github.event.head_commit.message, '[skip CI]')
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Clone
+        uses: actions/checkout@master
+        with:
+          repository: Propagram/Luagram
+          path: Redbean
+
+      - name: Download & Pack
+        run: |
+          curl https://redbean.dev/redbean-latest.com >redbean.com
+          mv Redbean .lua
+          zip -r redbean.com .lua
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        #if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            ./redbean.com
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

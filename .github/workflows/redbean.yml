@@ -28,11 +28,12 @@ jobs:
           curl https://redbean.dev/redbean-latest.com >redbean-lg.com
           mv Redbean .lua
           zip -r redbean-lg.com .lua/Luagram.lua
+          zip redbean-lg.zip redbean-lg.com
 
       - name: Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: redbean-lg.com
+          artifacts: redbean-lg.zip
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ inputs.tag }}
           draft: true

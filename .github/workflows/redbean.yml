@@ -7,6 +7,9 @@ on:
       tag:
         required: true
         type: string
+      draft:
+        required: true
+        type: boolean
 
 jobs:
   build:
@@ -35,5 +38,6 @@ jobs:
         with:
           artifacts: redbean-lg.zip
           token: ${{ secrets.GITHUB_TOKEN }}
+          name: redbean-luagram-${{ inputs.tag }}
           tag: ${{ inputs.tag }}
-          draft: true
+          draft: ${{ inputs.draft }}

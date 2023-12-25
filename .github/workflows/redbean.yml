@@ -2,7 +2,7 @@ name: redbean
 
 
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
       tag:
         required: true
@@ -12,7 +12,6 @@ jobs:
   build:
     name: Release
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/') || !contains(github.event.head_commit.message, '[skip CI]')
     steps:
       - uses: actions/checkout@v2
 

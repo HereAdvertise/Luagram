@@ -32,7 +32,7 @@ jobs:
       - name: Release
         uses: ncipollo/release-action@v1
         with:
-          bodyFile: redbean-lg.com
+          artifacts: redbean-lg.com
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ inputs.tag }}
           draft: true

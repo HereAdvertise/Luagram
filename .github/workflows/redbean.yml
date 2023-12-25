@@ -2,13 +2,11 @@ name: redbean
 
 
 on:
-  label:
-    #branches: [ main ]
-    #push:
-    
+  push:
+    branches: [ main ]
     #tags: 'v*.*.*'
-  #pull_request:
-    #branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:

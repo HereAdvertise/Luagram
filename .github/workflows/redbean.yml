@@ -29,6 +29,9 @@ jobs:
       - name: Download & Zip
         run: |
           curl https://redbean.dev/redbean-latest.com >redbean-lg.com
+          rm -r Redbean/spec
+          rm -r Redbean/docs
+          rm -r Redbean/.git
           mv Redbean .lua
           zip -r redbean-lg.com .lua/Luagram.lua
           zip redbean-lg.zip redbean-lg.com

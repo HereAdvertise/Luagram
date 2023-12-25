@@ -1,4 +1,4 @@
-name: Redbean
+name: redbean
 
 on:
   push:

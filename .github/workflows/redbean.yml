@@ -2,12 +2,11 @@ name: redbean
 
 
 on:
-  push:
-    branches: [ main ]
-    #tags: 'v*.*.*'
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
 
 jobs:
   build:
@@ -33,4 +32,5 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ inputs.tag }}
           draft: true

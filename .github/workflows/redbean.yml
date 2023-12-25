@@ -30,7 +30,7 @@ jobs:
           zip -r redbean-lg.com .lua/Luagram.lua
 
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |

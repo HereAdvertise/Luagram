@@ -22,7 +22,7 @@ jobs:
           repository: Propagram/Luagram
           path: Redbean
 
-      - name: Download & Pack
+      - name: Download & Zip
         run: |
           curl https://redbean.dev/redbean-latest.com >redbean-lg.com
           mv Redbean .lua

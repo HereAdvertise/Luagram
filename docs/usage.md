@@ -1,7 +1,7 @@
 ---
 title: Basic usage
 layout: default
-nav_order: 2
+nav_order: 3
 ---
 
 Below is an example of **Hello world**. This code is similar to what you find in other Telegram bot libraries. Luagram can do much more than that!

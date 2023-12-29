@@ -855,11 +855,12 @@ addons.compose = function(self)
         end
     end, function(self, key)
         local value = rawget(getmetatable(self), key)
-        if value == nil and type(key) == "string" and rawget(self, "_chat_id") then
-            if not string.match(key, "^_") and not string.match(key, "^on_%w+$") then
+        if value == nil and type(key) == "string" then
+            local _chat_id = rawget(self, "_chat_id")
+            if _chat_id and not string.match(key, "^_") and not string.match(key, "^on_%w+$") then
                 return function(self, data, multipart)
                     if type(data) == "table" and data.chat_id == nil then
-                        data.chat_id = self._chat_id
+                        data.chat_id = _chat_id
                     end
                     return telegram(self, key, data, multipart)
                 end
@@ -1204,9 +1205,8 @@ addons.chat = function(self)
             if not string.match(key, "^_") and not string.match(key, "^on_%w+$") then
                 return function(self, data, multipart)
                     if type(data) == "table" and data.chat_id == nil then
-                        data.chat_id = self._chat_id
+                        data.chat_id = rawget(self, "_chat_id")
                     end
-                    print("@@@@",key, data, multipart)
                     return telegram(self, key, data, multipart)
                 end
             end

@@ -167,9 +167,6 @@ local function telegram(self, method, data, multipart)
         headers = headers
     })
     print("<--", response)
-    if response_status ~= 200 then
-        return nil, response, response_status, response_headers
-    end
     local ok, result = pcall(_json_decoder, response)
     if ok and type(result) == "table" then
         if not result.ok then
@@ -710,6 +707,9 @@ local function send_object(self, chat_id, language_code, name, ...)
     if object._type == "compose" then
 
         local this = object:clone()
+        
+        this._chat_id = chat_id
+        this._language_code = language_code
 
         this.send = function(self, ...)
             chat:send(...)
@@ -721,16 +721,16 @@ local function send_object(self, chat_id, language_code, name, ...)
             return self
         end
 
-        local result = parse_compose(chat, this, ...)
-
-        if object._predispatch then
-            local parsed_result = object._predispatch(result)
-            if type(parsed_result) == "table" then
-                result = parsed_result
-            end
-        end
+        local result, err = parse_compose(chat, this, ...)
 
         if result then
+            
+            if object._predispatch then
+                local parsed_result = object._predispatch(result)
+                if type(parsed_result) == "table" then
+                    result = parsed_result
+                end
+            end
 
             local response, err
 
@@ -755,7 +755,7 @@ local function send_object(self, chat_id, language_code, name, ...)
             end
 
         else
-            error("parser error")
+            error(string.format("parser error: %s", err))
         end
 
     elseif object._type == "session" then
@@ -853,6 +853,19 @@ addons.compose = function(self)
         if name ~= false then
             self.__class._objects[name] = self
         end
+    end, function(self, key)
+        local value = rawget(getmetatable(self), key)
+        if value == nil and type(key) == "string" and rawget(self, "_chat_id") then
+            if not string.match(key, "^_") and not string.match(key, "^on_%w+$") then
+                return function(self, data, multipart)
+                    if type(data) == "table" and data.chat_id == nil then
+                        data.chat_id = self._chat_id
+                    end
+                    return telegram(self, key, data, multipart)
+                end
+            end
+        end
+        return value
     end)
 
     local compose = self.compose
@@ -872,8 +885,8 @@ addons.compose = function(self)
                 end
             end
         end
-        if not clone._source then
-            clone._source = self
+        if not clone._origin then
+            clone._origin = self
         end
         return clone
     end
@@ -1187,12 +1200,13 @@ addons.chat = function(self)
         self._language_code = language_code
     end, function(self, key)
         local value = rawget(getmetatable(self), key)
-        if value == nil then
-            if not string.match(key, "^on_%w+$") then
+        if value == nil and type(key) == "string" then
+            if not string.match(key, "^_") and not string.match(key, "^on_%w+$") then
                 return function(self, data, multipart)
                     if type(data) == "table" and data.chat_id == nil then
                         data.chat_id = self._chat_id
                     end
+                    print("@@@@",key, data, multipart)
                     return telegram(self, key, data, multipart)
                 end
             end
@@ -1345,7 +1359,7 @@ end
 
 function Luagram:__index(key)
     local value = rawget(Luagram, key)
-    if value == nil then
+    if value == nil and type(key) == "string" then
         local event = string.match(key, "^on_(%w+)$")
         if event then
             return function(self, callback)
@@ -1457,7 +1471,7 @@ local function callback_query(self, chat_id, language_code, update_data)
         return self
     end
 
-    this.update = function(self)
+    this.source = function(self)
         return self._update_data, self._update_type
     end
 
@@ -1517,7 +1531,7 @@ local function callback_query(self, chat_id, language_code, update_data)
         end
 
         if result == true then
-            this = action.compose._source:clone()
+            this = action.compose._origin:clone()
         elseif result == false then
             this:clear("buttons")
         elseif type(result) == "string" then
@@ -1712,7 +1726,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
         return "shipping"
     end
 
-    this.payload = function()
+    this.source = function()
         return update_data, "shipping_query"
     end
 
@@ -1811,7 +1825,7 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
         return "review"
     end
 
-    this.payload = function()
+    this.source = function()
         return update_data, "pre_checkout_query"
     end
 
@@ -1887,7 +1901,7 @@ local function successful_payment(self, chat_id, language_code, update_data)
         return "complete"
     end
 
-    this.payload = function()
+    this.source = function()
         return update_data, "successful_payment"
     end
 

@@ -889,6 +889,8 @@ addons.compose = function(self)
         if not clone._origin then
             clone._origin = self
         end
+        clone._chat_id = nil
+        clone._language_code = nil
         return clone
     end
 

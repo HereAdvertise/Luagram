@@ -707,7 +707,7 @@ local function send_object(self, chat_id, language_code, name, ...)
     if object._type == "compose" then
 
         local this = object:clone()
-        
+
         this._chat_id = chat_id
         this._language_code = language_code
 
@@ -724,7 +724,7 @@ local function send_object(self, chat_id, language_code, name, ...)
         local result, err = parse_compose(chat, this, ...)
 
         if result then
-            
+
             if object._predispatch then
                 local parsed_result = object._predispatch(result)
                 if type(parsed_result) == "table" then

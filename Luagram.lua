@@ -42,7 +42,12 @@ local function detect_env()
     local ltn12 = require("ltn12")
     http_provider = function(url, options)
         local out = {}
-        options.source = ltn12.source.string(options.body)
+        if not options then
+            options = {}
+        end
+        if options.body then
+            options.source = ltn12.source.string(options.body)
+        end
         options.sink = ltn12.sink.table(out)
         options.url = url
         local _, status, headers = http.request(options)
@@ -100,6 +105,7 @@ local mimetypes = {
     gif = "image/gif",
     jpeg = "image/jpg",
     jpg = "image/jpg",
+    webp = "image/webp",
 }
 
 local function telegram(self, method, data, multipart)
@@ -143,6 +149,7 @@ local function telegram(self, method, data, multipart)
             end
             body[#body + 1] = "\r\n"
         end
+        body[#body + 1] = string.format("--%s--\r\n\r\n", boundary)
         body = table.concat(body)
         headers = {
             ["content-type"] = string.format("multipart/form-data; boundary=%s", boundary),
@@ -160,7 +167,11 @@ local function telegram(self, method, data, multipart)
             headers[string.lower(key)] = value
         end
     end
-    print("-->", body)
+    if not multipart then
+        print("-->", body)
+    else
+        print("--> (multipart)")
+    end
     local response, response_status, response_headers = request(self, api, {
         method = "POST",
         body = body,
@@ -426,7 +437,7 @@ print("index: ", index,item._type)
 
             -- others
             elseif item._type == "media" then
-                media = item._media
+                media = item.media
             elseif item._type == "title" then
                 title = text(chat, item.title)
             elseif item._type == "description" then
@@ -437,7 +448,7 @@ print("index: ", index,item._type)
                     amount = item.amount
                 }
             elseif item._type == "data" then
-                data[item._key] = data[item._value]
+                data[item.key] = item.value
 
             -- interactions
             elseif item._type == "button" then
@@ -535,11 +546,12 @@ print("index: ", index,item._type)
         elseif string.match(media, "%.") then
             media_type = "path"
             multipart = true
+            print(":::::aqui")
         else
             media_type = "id"
         end
     end
-
+print(":::::aqui",media_type)
     if transaction and media and media_type == "url" then
         if not data.photo_url then
             data.photo_url = media
@@ -569,7 +581,7 @@ print("index: ", index,item._type)
         end
 
     elseif media and media_type == "url" then
-        local response, status, headers = request(media)
+        local response, status, headers = request(compose, media)
 
         if not response then
             error(status)
@@ -601,12 +613,12 @@ print("index: ", index,item._type)
 
         if extension == "gif" then
             method = "animation"
-        elseif extension == "png" or extension == "jpg" or extension == "jpeg" then
+        elseif extension == "png" or extension == "jpg" or extension == "jpeg" or extension == "webp" then
             method = "photo"
         else
             error(string.format("unknown media type: %s", media))
         end
-
+print("::::::::::::::0",method)
     elseif media then
         error(string.format("unknown media type: %s", tostring(media)))
     end
@@ -675,6 +687,7 @@ print("index: ", index,item._type)
     --deve enviar via multipart
 
     for key, value in pairs(data) do
+        print("adicionou", key, value)
         output[key] = value
     end
 
@@ -740,13 +753,13 @@ local function send_object(self, chat_id, language_code, name, ...)
             local response, err
 
             if result._method == "animation" then
-                response, err = self.__class:send_animation(result._output)
+                response, err = self.__class:send_animation(result._output, result._multipart)
             elseif result._method == "photo" then
-                response, err = self.__class:send_photo(result._output)
+                response, err = self.__class:send_photo(result._output, result._multipart)
             elseif result._method == "message" then
-                response, err = self.__class:send_message(result._output)
+                response, err = self.__class:send_message(result._output, result._multipart)
             elseif result._method == "invoice" then
-                response, err = self.__class:send_invoice(result._output)
+                response, err = self.__class:send_invoice(result._output, result._multipart)
             else
                 error("invalid method")
             end
@@ -1242,8 +1255,8 @@ addons.chat = function(self)
         return self
     end
 
-    chat.text = function(self, text)
-        return text(self, text)
+    chat.text = function(self, value)
+        return text(self, value)
     end
 
     return self
@@ -1755,7 +1768,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
         return update_data, "shipping_query"
     end
 
-    local _ = (function(ok, ...)
+    return (function(ok, ...)
 
         if not ok then
             self.__class:answer_shipping_query({
@@ -1773,7 +1786,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
             self.__class:answer_shipping_query({
                 shipping_query_id = update_data.id,
                 ok = false,
-                error_message = result
+                error_message = text(self, result)
             })
         elseif result == false then
             self.__class:answer_shipping_query({
@@ -1808,15 +1821,14 @@ local function shipping_query(self, chat_id, language_code, update_data)
                 shipping_options = options
             })
             return true
-        else
-            self.__class:answer_shipping_query({
-                shipping_query_id = update_data.id,
-                ok = false,
-                error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
-            })
-            catch(string.format("error on proccess shipping query: invalid return value"))
-            return
         end
+        
+        self.__class:answer_shipping_query({
+            shipping_query_id = update_data.id,
+            ok = false,
+            error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
+        })
+        catch(string.format("error on proccess shipping query: invalid return value"))
 
     end)(pcall(transaction.transaction, this, unlist(transaction.args)))
 
@@ -1854,7 +1866,7 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
         return update_data, "pre_checkout_query"
     end
 
-    local result = (function(ok, ...)
+    return (function(ok, ...)
 
         if not ok then
             self.__class:answer_pre_checkout_query({
@@ -1872,7 +1884,7 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
             self.__class:answer_pre_checkout_query({
                 pre_checkout_query_id = update_data.id,
                 ok = false,
-                error_message = result
+                error_message = text(self, result)
             })
         elseif result == false then
             self.__class:answer_pre_checkout_query({
@@ -1883,22 +1895,19 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
         elseif result == true then
             self.__class:answer_pre_checkout_query({
                 pre_checkout_query_id = update_data.id,
-                ok = true,
+                ok = true
             })
             return true
-        else
-            self.__class:answer_pre_checkout_query({
-                pre_checkout_query_id = update_data.id,
-                ok = false,
-                error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
-            })
-            catch(string.format("error on proccess pre checkout query: invalid return value"))
-            return
         end
+        
+        self.__class:answer_pre_checkout_query({
+            pre_checkout_query_id = update_data.id,
+            ok = false,
+            error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
+        })
+        catch(string.format("error on proccess pre checkout query: invalid return value"))
 
     end)(pcall(transaction.transaction, this, unlist(transaction.args)))
-
-    return result
 
 end
 
@@ -2040,7 +2049,7 @@ local function parse_update(self, update)
         end
 
         if string.match(update_data.invoice_payload, "^Luagram_transaction_%d+_%d+_%d+$") then
-            self.__class:answer_shipping_quer({
+            self.__class:answer_shipping_query({
                 shipping_query_id = update_data.id,
                 ok = false,
                 error_message = text(self:chat(chat_id, language_code), {"Unfortunately, there was an issue while completing this payment."})
@@ -2253,7 +2262,7 @@ function Luagram:updates(stop)
 end
 
 return setmetatable(Luagram, {
-  __call = function(self, ...)
-      return self.new(...)
-  end
+    __call = function(self, ...)
+        return self.new(...)
+    end
 })

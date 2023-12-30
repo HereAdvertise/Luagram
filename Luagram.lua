@@ -287,12 +287,12 @@ local function parse_compose(chat, compose, ...)
     local buttons = {}
     local interactions = {}
     local row = {}
-    local data = {
-        parse_mode = "HTML"
-    }
+    local data = {}
 
     local media, media_type
-    local title, description, price
+
+    local title, description
+    local prices = {}
 
     local multipart = false
     local method = "message"
@@ -428,12 +428,12 @@ print("index: ", index,item._type)
             elseif item._type == "media" then
                 media = item._media
             elseif item._type == "title" then
-                title = item._title
+                title = text(chat, item.title)
             elseif item._type == "description" then
-                description = item._description
+                description = text(chat, item.description)
             elseif item._type == "price" then
-                price = {
-                    label = item.label,
+                prices[#prices + 1] = {
+                    label = text(chat, item.label),
                     amount = item.amount
                 }
             elseif item._type == "data" then
@@ -460,6 +460,7 @@ print("index: ", index,item._type)
                 local uuid = string.format("Luagram_action_%s_%s_%s", chat._chat_id, id(chat), os.time())
                 interactions[#interactions + 1] = uuid
                 local interaction = {
+                    id = item.id,
                     compose = compose,
                     label = label,
                     action = item.action,
@@ -498,9 +499,10 @@ print("index: ", index,item._type)
                 local uuid = string.format("Luagram_transaction_%s_%s_%s", chat._chat_id, id(chat), os.time())
 
                 local interaction = {
+                    id = item.id,
                     compose = compose,
                     label = label,
-                    value = item.transaction,
+                    transaction = item.transaction,
                     interactions = interactions,
                     args = select("#", ...) > 0 and list(...) or compose.args
                 }
@@ -627,10 +629,12 @@ print("index: ", index,item._type)
         output.payload = payload
         output.start_parameter = payload
         output.protect_content = true
-        output.currency = chat._class._currency
-        output.provider_token = chat._class._provider_token
-        output.prices = {price}
+        output.currency = chat.__class._transaction_currency
+        output.provider_token = chat.__class._transaction_provider_token
+        output.prices = prices
     else
+        
+        data.parse_mode = "HTML"
 
         if method == "animation" then
             if media then
@@ -655,6 +659,7 @@ print("index: ", index,item._type)
     end
 
     output.chat_id = chat._chat_id
+
     if #buttons > 0 then
         output.reply_markup = {
             inline_keyboard	= buttons
@@ -1041,9 +1046,9 @@ addons.compose = function(self)
 
     compose.media = simple("media", "media")
 
-    compose.title = simple("title", "value")
+    compose.title = simple("title", "title")
 
-    compose.description = simple("description", "value")
+    compose.description = simple("description", "description")
 
     compose.price = multiple("price", "label", "amount")
 
@@ -1088,6 +1093,7 @@ addons.compose = function(self)
         end
         insert(self, _index, {
             _type = "action",
+            id = id(self),
             label = label,
             action = action
         })
@@ -1126,6 +1132,7 @@ addons.compose = function(self)
         end
         insert(self, _index, {
             _type = "transaction",
+            id = id(self),
             label = label,
             transaction = transaction
         })
@@ -1329,6 +1336,12 @@ function Luagram.new(options)
     self.__class = self
 
     self._token = options.token
+    
+    if options.transactions then
+        self._transaction_report_to = options.transactions.report_to
+        self._transaction_currency = options.transactions.currency
+        self._transaction_provider_token = options.transactions.provider_token
+    end
 
     self:addon("compose")
     self:addon("session")
@@ -1479,6 +1492,8 @@ local function callback_query(self, chat_id, language_code, update_data)
 
     this.this = function(self)
         for index = 1, #self do
+            print(action.id)
+            print(self[index].id)
             if type(self[index]) == "table" and self[index]._type == "action" and self[index].id == action.id then
                 self[index].index = index
                 return self[index]
@@ -1497,12 +1512,21 @@ local function callback_query(self, chat_id, language_code, update_data)
         for index = 1, #self do
             local item = self[index]
             if _type == "buttons" and type(item) == "table" then
-                if item._type == buttons[_type] then
+                if buttons[item._type] then
                     self[index] = true
                 end
             elseif _type == "texts" and type(item) == "table" then
-                if item._type == texts[_type] then
+                if texts[item._type] then
                     self[index] = true
+                end
+            end
+        end
+                print("#################################")
+        for k,v in pairs(self) do
+            print(k,v)
+            if type(v) =="table" then
+                for k2,v2 in pairs(v) do
+                    print(" "," ",k2, v2)
                 end
             end
         end
@@ -1533,14 +1557,14 @@ local function callback_query(self, chat_id, language_code, update_data)
         end
 
         if result == true then
-            this = action.compose._origin:clone()
+            this = self.compose.clone(action.compose._origin)
         elseif result == false then
             this:clear("buttons")
         elseif type(result) == "string" then
             local object = self.__class._objects[result]
             if object then
                 if object._type == "compose" then
-                    this = object:clone()
+                    this = self.compose.clone(object)
                 elseif  object._type == "session" then
                     for _, value in pairs(action.interactions) do
                         user.interactions[value] = nil
@@ -1665,7 +1689,6 @@ local function callback_query(self, chat_id, language_code, update_data)
         end
 
         if this._method == "message" then
-            print("aqui", require("json").encode(update_data))
             ok, message = self.__class:edit_message_text({
                 chat_id = chat_id,
                 message_id = update_data.message.message_id,
@@ -1831,7 +1854,7 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
         return update_data, "pre_checkout_query"
     end
 
-    local _ = (function(ok, ...)
+    local result = (function(ok, ...)
 
         if not ok then
             self.__class:answer_pre_checkout_query({
@@ -1875,6 +1898,8 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
 
     end)(pcall(transaction.transaction, this, unlist(transaction.args)))
 
+    return result
+
 end
 
 local function successful_payment(self, chat_id, language_code, update_data)
@@ -1915,6 +1940,8 @@ end
 local function chat_id(update_data, update_type)
     if update_type == "callback_query" then
         return update_data.message.chat.id, update_data.message.from.language_code
+    elseif update_type == "pre_checkout_query" or update_type == "shipping_query" then
+        return update_data.from.id, update_data.from.language_code
     end
     return assert(update_data.chat.id, "chat_id not found"), update_data.from.language_code
 end
@@ -1937,9 +1964,9 @@ local function parse_update(self, update)
         error("invalid update")
     end
 
-    local user = self._users:get(id)
-
     local chat_id, language_code = chat_id(update_data, update_type)
+    
+    local user = self._users:get(chat_id)
 
     if update_type == "callback_query" then
 
@@ -2008,7 +2035,7 @@ local function parse_update(self, update)
 
     elseif update_type == "shipping_query" then
 
-        if shipping_query(self, chat_id, update_data) == true then
+        if shipping_query(self, chat_id, language_code, update_data) == true then
             return self
         end
 
@@ -2023,7 +2050,7 @@ local function parse_update(self, update)
 
     elseif update_type == "pre_checkout_query" then
 
-        if pre_checkout_query(self, chat_id, update_data) == true then
+        if pre_checkout_query(self, chat_id, language_code, update_data) == true then
             return self
         end
 
@@ -2038,7 +2065,7 @@ local function parse_update(self, update)
 
     elseif update_type == "message" and update_data.successful_payment  then
 
-        if successful_payment(self, chat_id, update_data) == true then
+        if successful_payment(self, chat_id, language_code, update_data) == true then
             return self
         end
 
@@ -2049,16 +2076,20 @@ local function parse_update(self, update)
     end
 
     if not user then
-        self._users:set(id, {
+        print("$$$$$$$$$$$$$$$$$ criando user")
+        self._users:set(chat_id, {
             created_at = os.time(),
             interactions = {}
         })
-        user = self._users:get(id)
+        user = self._users:get(chat_id)
     end
 
     local thread = user.thread
 
     if thread then
+        
+        print("!!!!!!!!!!!!!!!!é thread", coroutine.status(thread.main))
+        
         if coroutine.status(thread.main) ~= "suspended" then
             user.thread = nil
         else

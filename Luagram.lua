@@ -58,14 +58,11 @@ local function detect_env()
     end
     local json
     ok, json = pcall(require, "cjson")
-    if ok then
-        json_encoder = json.encode
-        json_decoder = json.decode
-    else
+    if not ok then
         json = require("json")
-        json_encoder = json.encode
-        json_decoder = json.decode
     end
+    json_encoder = json.encode
+    json_decoder = json.decode
 end
 
 local function stdout(message)

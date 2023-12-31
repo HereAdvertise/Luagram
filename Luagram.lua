@@ -1180,7 +1180,7 @@ addons.session = function(self)
 
     session.catch = function(self, catch)
         self._catch = function(...)
-            catch("(", self._name, ") ", ...)
+            catch(self._name, ...)
         end
         return self
     end

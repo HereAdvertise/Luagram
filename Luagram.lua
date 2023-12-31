@@ -168,9 +168,9 @@ local function telegram(self, method, data, multipart)
         end
     end
     if not multipart then
-        print("-->", body)
+        print("-->", method, body)
     else
-        print("--> (multipart)")
+        print("--> (multipart)", method)
     end
     local response, response_status, response_headers = request(self, api, {
         method = "POST",
@@ -278,6 +278,8 @@ end
 -- se acontecer algum erro na função main da session: catch da session
 -- caso contrario catch da instance
 
+local send_object
+
 local function parse_compose(chat, compose, ...)
     -- é muito simples parsear uma mensagem
     --essa função de sex executada com pcall?
@@ -302,7 +304,7 @@ local function parse_compose(chat, compose, ...)
 
     local media, media_type
 
-    local title, description
+    local title, description = {}, {}
     local prices = {}
 
     local multipart = false
@@ -326,21 +328,30 @@ local function parse_compose(chat, compose, ...)
         local item = compose[index]
         if type(item) == "table" and item._type and item._indexed ~= compose._id then
             item._indexed = compose._id
-print("index: ", index,item._type)
+
             -- runtime
             if item._type == "run" then
 
                 compose._runtime = index + 1
-                local err = (function(ok, ...)
+                local object, args = (function(ok, ...)
                     if not ok then
                         compose._catch(...)
-                        return ...
+                        return
                     end
-                end)(pcall(item.run, compose, unlist(select("#", ...) > 0 and list(...) or compose.args)))
-                if err then
-                   return nil, err
-                end
+                    return ..., list(select(2, ...))
+                end)(pcall(item.run, compose, unlist(select("#", ...) > 0 and list(...) or compose._args)))
                 compose._runtime = nil
+                
+                if object then
+                    
+                    if type(object) == "table" then
+                        object = object._name
+                    end
+
+                    send_object(compose, chat._chat_id, chat._language_code, object, unlist(args["#"] > 0 and args or (select("#", ...) > 0 and list(...) or list())))
+
+                    return false
+                end
 
             -- texts
             elseif item._type == "text" then
@@ -434,14 +445,19 @@ print("index: ", index,item._type)
             elseif item._type == "html" then
                 close_tags()
                 texts[#texts + 1] = text(chat, item.value)
+            elseif item._type == "quote" then
+                close_tags()
+                texts[#texts + 1] = "\n"
+                texts[#texts + 1] = escape(text(chat, item.value))
+                texts[#texts + 1] = "\n"
 
             -- others
             elseif item._type == "media" then
                 media = item.media
             elseif item._type == "title" then
-                title = text(chat, item.title)
+                title[#title + 1] = text(chat, item.title)
             elseif item._type == "description" then
-                description = text(chat, item.description)
+                description[#description + 1] = text(chat, item.description)
             elseif item._type == "price" then
                 prices[#prices + 1] = {
                     label = text(chat, item.label),
@@ -476,7 +492,7 @@ print("index: ", index,item._type)
                     label = label,
                     action = item.action,
                     interactions = interactions,
-                    args = select("#", ...) > 0 and list(...) or compose.args
+                    args = item.args["#"] > 0 and item.args or (select("#", ...) > 0 and list(...) or compose._args)
                 }
                 user.interactions[uuid] = interaction
                 row[#row + 1] = {
@@ -498,10 +514,10 @@ print("index: ", index,item._type)
                 local label = text(chat, item.label)
 
                 if item.label ~= false then
-                    table.insert(buttons, 1, {
+                    table.insert(buttons, 1, {{
                         text = label,
                         pay = true
-                    })
+                    }})
                 else
                     --não pode haver mais nenhum botão nesse caso
                     transaction_label = true
@@ -515,7 +531,7 @@ print("index: ", index,item._type)
                     label = label,
                     transaction = item.transaction,
                     interactions = interactions,
-                    args = select("#", ...) > 0 and list(...) or compose.args
+                    args = item.args["#"] > 0 and item.args or (select("#", ...) > 0 and list(...) or compose._args)
                 }
 
                 payload = uuid
@@ -525,8 +541,10 @@ print("index: ", index,item._type)
                 --colocar esse botão no primeiro item da lista
 
             elseif item._type == "row" then
-                buttons[#buttons + 1] = row
-                row = {}
+                if #row > 0 then
+                    buttons[#buttons + 1] = row
+                    row = {}
+                end
             end
         end
         index = index + 1
@@ -636,8 +654,8 @@ print("::::::::::::::0",method)
         end
 
         method = "invoice"
-        output.title = title
-        output.description = description
+        output.title = table.concat(title)
+        output.description = table.concat(description)
         output.payload = payload
         output.start_parameter = payload
         output.protect_content = true
@@ -699,7 +717,7 @@ print("::::::::::::::0",method)
     return compose
 end
 
-local function send_object(self, chat_id, language_code, name, ...)
+send_object = function(self, chat_id, language_code, name, ...)
 
     local users = self.__class._users
     local objects = self.__class._objects
@@ -772,7 +790,7 @@ local function send_object(self, chat_id, language_code, name, ...)
                 object._dispatch(response)
             end
 
-        else
+        elseif result == nil then
             error(string.format("parser error: %s", err))
         end
 
@@ -964,7 +982,7 @@ addons.compose = function(self)
     end
 
     local items = {
-        "text", "bold", "italic", "underline", "spoiler", "strike", "mono", "pre", "html"
+        "text", "bold", "italic", "underline", "spoiler", "strike", "mono", "pre", "html", "quote"
     }
 
     for index = 1, #items do
@@ -1097,18 +1115,22 @@ addons.compose = function(self)
 
     compose.action = function(self, ...)
         local index, label, action = ...
+        local args
         local _index
         if type(index) == "number" and select("#", ...) > 1 then
             _index = index
+            args = list(select(4, ...))
         else
             action = label
             label = index
+            args = list(select(3, ...))
         end
         insert(self, _index, {
             _type = "action",
             id = id(self),
             label = label,
-            action = action
+            action = action,
+            args = args
         })
         return self
     end
@@ -1132,6 +1154,7 @@ addons.compose = function(self)
 
     compose.transaction = function(self, ...)
         local index, label, transaction = ...
+        local args
         local _index
         if type(index) == "number" and select("#", ...) > 1 then
             _index = index
@@ -1142,12 +1165,24 @@ addons.compose = function(self)
         if type(label) == "function" then
             transaction = label
             label = false
+            if _index then
+                args = list(select(3, ...))
+            else
+                args = list(select(2, ...))
+            end
+        else
+            if _index then
+                args = list(select(4, ...))
+            else
+                args = list(select(3, ...))
+            end
         end
         insert(self, _index, {
             _type = "transaction",
             id = id(self),
             label = label,
-            transaction = transaction
+            transaction = transaction,
+            args = args
         })
         return self
     end
@@ -1341,7 +1376,6 @@ function Luagram.new(options)
     self._objects = {}
     self._events = {}
     self._users = lru.new(options.cache or 1024)
-    self._actions = {}
     self._catch = catch_error
     self._http_provider = options.http_provider
     self._json_encoder = options.json_encoder
@@ -1520,7 +1554,7 @@ local function callback_query(self, chat_id, language_code, update_data)
             button = true, action = true, location = true, transaction = true, row = true
         }
         local texts ={
-            text = true, bold = true, italic = true, underline = true, spoiler = true, strike = true, link = true, mention = true, mono = true, pre = true, line = true, html = true
+            text = true, bold = true, italic = true, underline = true, spoiler = true, strike = true, link = true, mention = true, mono = true, pre = true, line = true, html = true, quote = true
         }
         for index = 1, #self do
             local item = self[index]
@@ -1625,10 +1659,9 @@ local function callback_query(self, chat_id, language_code, update_data)
                 action.compose._catch(message)
                 return
             end
+            
             send_object(self, chat_id, language_code, this._name, unlist(select("#", ...) > 0 and list(...) or action.args))
 
-            --nesse caso se a transaction possuir teclado, o que fazer??
-            --inutilizar (action.transactions???)
             return
         end
 
@@ -1768,7 +1801,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
         return update_data, "shipping_query"
     end
 
-    return (function(ok, ...)
+    local _ = (function(ok, ...)
 
         if not ok then
             self.__class:answer_shipping_query({
@@ -1788,12 +1821,14 @@ local function shipping_query(self, chat_id, language_code, update_data)
                 ok = false,
                 error_message = text(self, result)
             })
+            return
         elseif result == false then
             self.__class:answer_shipping_query({
                 shipping_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, {"Sorry, delivery to your desired address is unavailable."})
             })
+            return
         elseif select("#", ...) >  0 then
             local results = {...}
             local options = {}
@@ -1820,7 +1855,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
                 ok = true,
                 shipping_options = options
             })
-            return true
+            return
         end
         
         self.__class:answer_shipping_query({
@@ -1831,6 +1866,8 @@ local function shipping_query(self, chat_id, language_code, update_data)
         catch(string.format("error on proccess shipping query: invalid return value"))
 
     end)(pcall(transaction.transaction, this, unlist(transaction.args)))
+
+    return true
 
 end
 
@@ -1866,7 +1903,7 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
         return update_data, "pre_checkout_query"
     end
 
-    return (function(ok, ...)
+    local _ = (function(ok, ...)
 
         if not ok then
             self.__class:answer_pre_checkout_query({
@@ -1886,18 +1923,20 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
                 ok = false,
                 error_message = text(self, result)
             })
+            return
         elseif result == false then
             self.__class:answer_pre_checkout_query({
                 pre_checkout_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, {"Sorry, it won't be possible to complete the payment for the item you selected. Please try again in the bot."})
             })
+            return
         elseif result == true then
             self.__class:answer_pre_checkout_query({
                 pre_checkout_query_id = update_data.id,
                 ok = true
             })
-            return true
+            return
         end
         
         self.__class:answer_pre_checkout_query({
@@ -1908,6 +1947,8 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
         catch(string.format("error on proccess pre checkout query: invalid return value"))
 
     end)(pcall(transaction.transaction, this, unlist(transaction.args)))
+
+    return true
 
 end
 
@@ -2030,7 +2071,7 @@ local function parse_update(self, update)
                 callback_query_id = update_data.id,
                 text = text(self:chat(chat_id, language_code), {"Welcome back! This message is outdated. Let's start over!"})
             })
-            if send_object(self, chat_id, language_code, "/start", false) == true then
+            if send_object(self, chat_id, language_code, "/start") == true then
                 return self
             end
         end
@@ -2149,12 +2190,16 @@ local function parse_update(self, update)
 
         local command, space, payload = string.match(text, "^(/[a-zA-Z0-9_]+)(.?)(.*)$")
 
-        if command and (space == " " or space == "") then
-
-            if send_object(self, chat_id, language_code, command, payload) == true then
-                -- se a função send retoirnar true significa que foi enviado com sucesso
-                -- o comando existe
-                return self
+        if command then
+            
+            if space == " " and payload ~= "" then
+                if send_object(self, chat_id, language_code, command, payload) == true then
+                    return self
+                end
+            else
+                if send_object(self, chat_id, language_code, command) == true then
+                    return self
+                end
             end
 
         end
@@ -2163,7 +2208,7 @@ local function parse_update(self, update)
         --0 nada foi processado até aqui
         --chamar o entry point se haver
 
-        if send_object(self, chat_id, language_code, "/start", false) == true then
+        if send_object(self, chat_id, language_code, "/start") == true then
             -- se a função send retoirnar true significa que foi enviado com sucesso
             -- entry point existe
             return self

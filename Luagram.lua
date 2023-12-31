@@ -1183,9 +1183,33 @@ addons.compose = function(self)
 
     compose.dispatch = function(self, dispatch, before)
         if before then
-            self._predispatch = dispatch
+            if dispatch == false then
+                self._predispatch = nil
+                return self
+            end
+            if self._predispatch then
+                local _predispatch = self._predispatch
+                self._predispatch = function(...)
+                    _predispatch(...)
+                    return dispatch(...)
+                end
+            else
+                self._predispatch = dispatch
+            end
         else
-            self._dispatch = dispatch
+            if dispatch == false then
+                self._dispatch = nil
+                return self
+            end
+            if self._dispatch then
+                local _dispatch = self._dispatch
+                self._dispatch = function(...)
+                    _dispatch(...)
+                    return dispatch(...)
+                end
+            else
+                self._dispatch = dispatch
+            end
         end
         return self
     end

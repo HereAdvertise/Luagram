@@ -436,9 +436,9 @@ local function parse_compose(chat, compose, ...)
                 texts[#texts + 1] = text(chat, item.value)
             elseif item._type == "quote" then
                 close_tags()
-                texts[#texts + 1] = "\n"
+                texts[#texts + 1] = "<blockquote>"
                 texts[#texts + 1] = escape(text(chat, item.value))
-                texts[#texts + 1] = "\n"
+                texts[#texts + 1] = "</blockquote>"
 
             -- others
             elseif item._type == "media" then

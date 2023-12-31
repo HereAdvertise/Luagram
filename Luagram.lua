@@ -417,7 +417,7 @@ local function parse_compose(chat, compose, ...)
                 else
                     open_tags.open = true
                 end
-                        elseif item._type == "quote" then
+            elseif item._type == "quote" then
                 if open_tags.quote then
                     close_tags()
                 end
@@ -438,38 +438,32 @@ local function parse_compose(chat, compose, ...)
                 end
                 close_tags()
             elseif item._type == "link" then
-                close_tags()
                 texts[#texts + 1] = '<a href="'
                 texts[#texts + 1] = escape(item.url)
                 texts[#texts + 1] = '">'
                 texts[#texts + 1] = escape(text(chat, item.label))
                 texts[#texts + 1] = "</a>"
             elseif item._type == "mention" then
-                close_tags()
                 texts[#texts + 1] = '<a href="'
                 texts[#texts + 1] = escape(item.user)
                 texts[#texts + 1] = '">'
                 texts[#texts + 1] = escape(text(chat, item.name))
                 texts[#texts + 1] = "</a>"
             elseif item._type == "emoji" then
-                close_tags()
                 texts[#texts + 1] = '<tg-emoji emoji-id="'
                 texts[#texts + 1] = escape(item.emoji)
                 texts[#texts + 1] = '">'
                 texts[#texts + 1] = escape(text(chat, item.placeholder))
                 texts[#texts + 1] = "</tg-emoji>"
             elseif item._type == "mono" then
-                close_tags()
                 texts[#texts + 1] = "<code>"
                 texts[#texts + 1] = escape(text(chat, item.value))
                 texts[#texts + 1] = "</code>"
             elseif item._type == "pre" then
-                close_tags()
                 texts[#texts + 1] = "<pre>"
                 texts[#texts + 1] = escape(text(chat, item.value))
                 texts[#texts + 1] = "</pre>"
             elseif item._type == "code" then
-                close_tags()
                 if item.language then
                     texts[#texts + 1] = '<pre><code class="language-'
                     texts[#texts + 1] = escape(item.language)
@@ -485,7 +479,6 @@ local function parse_compose(chat, compose, ...)
                     texts[#texts + 1] = "\n"
                     texts[#texts + 1] = escape(text(chat, item.value))
                 end
-                close_tags()
                 texts[#texts + 1] = "\n"
             elseif item._type == "html" then
                 close_tags()

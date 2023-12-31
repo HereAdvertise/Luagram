@@ -1,3 +1,5 @@
+-- (c) 2023 Propagram. MIT Licensed.
+
 local unpack = table.unpack or unpack
 
 local function list(...)
@@ -109,10 +111,6 @@ local mimetypes = {
 }
 
 local function telegram(self, method, data, multipart)
-
-    --multipart é nome da key que é o arquivo multipart
-    --então se haver esse argumento é multipart
-    --sendo multipart, ao passar por essa keu ele encoda como multipart
     local _json_encoder = self.__class._json_encoder or json_encoder
     local _json_decoder = self.__class._json_decoder or json_decoder
     local api = self.__class._api or "https://api.telegram.org/bot%s/%s"
@@ -272,18 +270,9 @@ local function catch_error(...)
     stderr(debug.traceback(table.concat(message, "\n\n")))
 end
 
--- se acontecer algum erro nas funções runtime do compose: catch do compose
--- caso contrario catch da instance
-
--- se acontecer algum erro na função main da session: catch da session
--- caso contrario catch da instance
-
 local send_object
 
 local function parse_compose(chat, compose, ...)
-    -- é muito simples parsear uma mensagem
-    --essa função de sex executada com pcall?
-
     print("entrou no compose parser@@@@@@")
 
     local users = chat.__class._users
@@ -519,7 +508,6 @@ local function parse_compose(chat, compose, ...)
                         pay = true
                     }})
                 else
-                    --não pode haver mais nenhum botão nesse caso
                     transaction_label = true
                 end
 
@@ -537,8 +525,6 @@ local function parse_compose(chat, compose, ...)
                 payload = uuid
 
                 user.interactions[uuid] = interaction
-                --se label for igual a false:
-                --colocar esse botão no primeiro item da lista
 
             elseif item._type == "row" then
                 if #row > 0 then
@@ -641,13 +627,6 @@ print("::::::::::::::0",method)
         error(string.format("unknown media type: %s", tostring(media)))
     end
 
-    --lançar um erro aqui se for transactrion e não haver payment_successfully event
-    --se for transaction colocar pra mostrar recibo e mdata
-    --olhar botgram
-
-    --dependendo do método da mensagem e havendo multipart
-    --colocar o nome do field aqui
-
     if transaction then
         if media then
             output.photo_url = media
@@ -695,14 +674,6 @@ print("::::::::::::::0",method)
             inline_keyboard	= buttons
         }
     end
-
-
-    --aqui deve processar de acordo com o tipo da mensagem
-    --se for transaction:
-    --deve checar se há os campos certos
-    --se for media deve informar o field certo de acordo
-    --se a media for um io.open
-    --deve enviar via multipart
 
     for key, value in pairs(data) do
         print("adicionou", key, value)
@@ -796,9 +767,6 @@ send_object = function(self, chat_id, language_code, name, ...)
 
     elseif object._type == "session" then
 
-        -- aqui deve-se criar uma nova sessão
-        --chmar a nova sessão
-
         if not object._main then
             error(string.format("undefined main session thread: %s", name))
             return
@@ -840,27 +808,6 @@ send_object = function(self, chat_id, language_code, name, ...)
 
     return true
 
-    -- essa função é chamada para criar um novo objeto para self
-
-    --?? uma coisa que devemos fazer é preporcessar o name se self._objects[name]
-    --porque pode ser passado nomes traduzíveis
-    --mas o problema, em que momento?
-    --no momento da declação não é possivel, pois pode ser passado olocale depois
-    --na prórpia função locale então??
-    --fazer um loop lá e verificar se key é um text ou i18n <------
-    -- também fazer um loop caso já haja locales
-    --então o certo é criar uma função
-
-    --verificar o ypo do objetoii
-
-    --se compose: parsear um novo clone da mensage
-    --(criar metodo: chat, send)
-    --enviar
-
-    -- session: criar uma sessao nova
-
-    --retirnar true caso sucesso
-
 end
 
 local addons = {}
@@ -871,15 +818,6 @@ addons.compose = function(self)
         if name == nil then
             name = "/start"
         end
-
-        -- talvez usar a funaçõ text() aqui para aceitar names localizados podem ser útil
-        -- {""}
-        -- exceção é /start
-        -- mesma coisa para a session
-        -- mas para detectar o idioma (para a função text)
-        -- necessário ter o update aqui
-        -- mas nesse caso não será possível salvar essa classe em __class
-        --talvez seja necessário fazer self.__class._objects[name] = self na função receive mesmo
 
         self._type = "compose"
         self._id = id(self)
@@ -1505,15 +1443,6 @@ local function callback_query(self, chat_id, language_code, update_data)
 
     action.lock = true
 
-
-
-    -- necessáriorealizar uma copia da mensagem original
-    -- essa mensagem é passada a função
-    -- como realizar uma cópia de maneira adequada?
-    -- criando  uma classe (talvez um argumento false)
-    -- então copiar todos os itens do original e jogar no item novo novamente
-    -- provavelmente a melhor maneira
-
     local this = action.compose:clone()
 
     this._update_data = update_data
@@ -1683,8 +1612,7 @@ local function callback_query(self, chat_id, language_code, update_data)
             end
 
         elseif not action.compose._media and this._media then
-            --remover os botões da mensagem antiga
-            --enviar uma nova mensagem
+
             for _, value in pairs(action.interactions) do
                 user.interactions[value] = nil
             end
@@ -1705,27 +1633,7 @@ local function callback_query(self, chat_id, language_code, update_data)
             user.interactions[value] = nil
         end
 
---        print("antes")
---        for k,v in pairs(this) do
---            print(k,v)
---            if type(v) =="table" then
---                for k2,v2 in pairs(v) do
---                    print(" "," ",k2, v2)
---                end
---            end
---        end
-
         local compose = parse_compose(chat, this, unlist(select("#", ...) > 0 and list(...) or action.args))
-
---        print("depois")
---        for k,v in pairs(compose) do
---            print(k,v)
---            if type(v) =="table" then
---                for k2,v2 in pairs(v) do
---                    print(" "," ",k2, v2)
---                enn
---            end
---        end
 
         local ok, message
 
@@ -2020,8 +1928,6 @@ local function parse_update(self, update)
 
     if update_type == "callback_query" then
 
-        -- se retornar true, significa que foi handled já
-        -- se retornar false ou nil, significa que não foi
         if callback_query(self, chat_id, language_code, update_data) == true then
             return self
         end
@@ -2075,13 +1981,6 @@ local function parse_update(self, update)
                 return self
             end
         end
-
-        -- aqui deve -se verificar se o callback_query é o formato do luagram
-        -- e responder de acordo
-        --continuar para que seja enviado o entry point
-
-        --luagram_event_(name) --> pesquisar por esse event
-        --se houver: chamar e return
 
     elseif update_type == "shipping_query" then
 
@@ -2179,11 +2078,6 @@ local function parse_update(self, update)
         end
     end
 
-
-    --verificar se user não estiver com uma sessão ativa já (coroutine)
-    --testar e continuar caso esteja
-
-    --vertificar se não é comando
     if update_type == "message" then
 
         local text = update_data.text
@@ -2204,19 +2098,11 @@ local function parse_update(self, update)
 
         end
 
-
-        --0 nada foi processado até aqui
-        --chamar o entry point se haver
-
         if send_object(self, chat_id, language_code, "/start") == true then
-            -- se a função send retoirnar true significa que foi enviado com sucesso
-            -- entry point existe
             return self
         end
 
     end
-
-    -- aqui deve ser chamado o evento pois não foi encontrado nada para processar
 
     if self._events[update_type] then
         if self._events[update_type](update) ~= false then
@@ -2234,20 +2120,10 @@ local function parse_update(self, update)
         return self
     end
 
-    -- aqui deve chamar a função catch, pois não foi capaturado o update
-    -- odefault da função catch é a função error
-
     error(string.format("unhandled update: %s", update._response))
 end
 
 function Luagram:update(update)
-    -- obter o autor do dona do update
-    -- verificar se o update não é um callback data query
-    -- verificar se o update não é um comando
-    -- verificar se o autor da menesagem posasui sessão aberta já
-    -- caso não haja, ir para o entry point (se houver)
-    -- caso não seja processado, enviar aos events
-
 
     xpcall(function()
 
@@ -2257,23 +2133,6 @@ function Luagram:update(update)
 
         parse_update(self, update)
     end, self._catch)
-
-    -- aqui deve acontecer um erro
-
-    --if update_type == "compose" then ----? talvez não passe por esse if, pois pode ser um callback_query por exemplo
-
-        -- verificar se é comando
-        -- se for comando significa que é para "zerar" a sessão atual e iniciar nesse comando
-
-        -- se não for comando verificar se há sessão atual
-        -- se não houver: criar a sessão com base  echmar o entry point (Se houver)
-        -- se já houver: continuar (se for thread) ou chmar o entry point (Se houver)
-
-
-
-    --end
-
-    -- se não haver entry point, deve ser chamado o evento
 
     return self
 end

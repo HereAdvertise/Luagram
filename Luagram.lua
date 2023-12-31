@@ -339,10 +339,6 @@ local function parse_compose(chat, compose, ...)
                     return false
                 end
 
-            -- se bold():text("ok"):close()
-            -- se bold():bold("ok"):text("ok"):close()
-            -- bold("ok"):text("ok")
-
             -- texts
             elseif item._type == "text" then
                 texts[#texts + 1] = escape(text(chat, item.value))
@@ -355,6 +351,11 @@ local function parse_compose(chat, compose, ...)
                 texts[#texts + 1] = "<b>"
                 if item.value then
                     texts[#texts + 1] = escape(text(chat, item.value))
+                    if not open_tags.open then
+                        close_tags()
+                    end
+                else
+                    open_tags.open = true
                 end
             elseif item._type == "italic" then
                 if open_tags.italic then
@@ -365,6 +366,11 @@ local function parse_compose(chat, compose, ...)
                 texts[#texts + 1] = "<i>"
                 if item.value then
                     texts[#texts + 1] = escape(text(chat, item.value))
+                    if not open_tags.open then
+                        close_tags()
+                    end
+                else
+                    open_tags.open = true
                 end
             elseif item._type == "underline" then
                 if open_tags.underline then
@@ -375,6 +381,11 @@ local function parse_compose(chat, compose, ...)
                 texts[#texts + 1] = "<u>"
                 if item.value then
                     texts[#texts + 1] = escape(text(chat, item.value))
+                    if not open_tags.open then
+                        close_tags()
+                    end
+                else
+                    open_tags.open = true
                 end
             elseif item._type == "spoiler" then
                 if open_tags.spoiler then
@@ -385,6 +396,11 @@ local function parse_compose(chat, compose, ...)
                 texts[#texts + 1] = "<tg-spoiler>"
                 if item.value then
                     texts[#texts + 1] = escape(text(chat, item.value))
+                    if not open_tags.open then
+                        close_tags()
+                    end
+                else
+                    open_tags.open = true
                 end
             elseif item._type == "strike" then
                 if open_tags.strike then
@@ -395,7 +411,32 @@ local function parse_compose(chat, compose, ...)
                 texts[#texts + 1] = "<s>"
                 if item.value then
                     texts[#texts + 1] = escape(text(chat, item.value))
+                    if not open_tags.open then
+                        close_tags()
+                    end
+                else
+                    open_tags.open = true
                 end
+                        elseif item._type == "quote" then
+                if open_tags.quote then
+                    close_tags()
+                end
+                open_tags.quote = true
+                open_tags[#open_tags + 1] = "</blockquote>"
+                texts[#texts + 1] = "<blockquote>"
+                if item.value then
+                    texts[#texts + 1] = escape(text(chat, item.value))
+                    if not open_tags.open then
+                        close_tags()
+                    end
+                else
+                    open_tags.open = true
+                end
+            elseif item._type == "close" then
+                if item.value then
+                    texts[#texts + 1] = escape(text(chat, item.value))
+                end
+                close_tags()
             elseif item._type == "link" then
                 close_tags()
                 texts[#texts + 1] = '<a href="'
@@ -449,18 +490,6 @@ local function parse_compose(chat, compose, ...)
             elseif item._type == "html" then
                 close_tags()
                 texts[#texts + 1] = text(chat, item.value)
-            elseif item._type == "quote" then
-                if open_tags.quote then
-                    close_tags()
-                end
-                open_tags.quote = true
-                open_tags[#open_tags + 1] = "</blockquote>"
-                texts[#texts + 1] = "<blockquote>"
-                if item.value then
-                    texts[#texts + 1] = escape(text(chat, item.value))
-                end
-            elseif item._type == "close" then
-                close_tags()
 
             -- others
             elseif item._type == "media" then
@@ -942,7 +971,7 @@ addons.compose = function(self)
     end
 
     local items = {
-        "text", "bold", "italic", "underline", "spoiler", "strike", "mono", "pre", "html", "quote"
+        "text", "bold", "italic", "underline", "spoiler", "strike", "mono", "pre", "html", "quote", "close"
     }
 
     for index = 1, #items do
@@ -1031,18 +1060,6 @@ addons.compose = function(self)
         insert(self, _index, {
             _type = "line",
             value = line
-        })
-        return self
-    end
-
-    compose.close = function(self, ...)
-        local index = ...
-        local _index
-        if type(index) == "number" then
-            _index = index
-        end
-        insert(self, _index, {
-            _type = "close"
         })
         return self
     end
@@ -1517,7 +1534,7 @@ local function callback_query(self, chat_id, language_code, update_data)
             button = true, action = true, location = true, transaction = true, row = true
         }
         local texts ={
-            text = true, bold = true, italic = true, underline = true, spoiler = true, strike = true, link = true, mention = true, mono = true, pre = true, line = true, html = true, quote = true
+            text = true, bold = true, italic = true, underline = true, spoiler = true, strike = true, link = true, mention = true, mono = true, pre = true, line = true, html = true, quote = true, close = true
         }
         for index = 1, #self do
             local item = self[index]

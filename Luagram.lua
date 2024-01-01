@@ -745,6 +745,7 @@ send_object = function(self, chat_id, language_code, name, ...)
             interactions = {}
         })
         user = users:get(chat_id)
+        user.updated_at = os.time()
     end
 
     local object = objects[name]
@@ -1629,7 +1630,7 @@ local function callback_query(self, chat_id, language_code, update_data)
                     for _, value in pairs(action.interactions) do
                         user.interactions[value] = nil
                     end
-                    self.__class:edit_message_reply_markup({
+                    self.__class:delete_message({
                         chat_id = chat_id,
                         message_id = update_data.message.message_id
                     })
@@ -1645,7 +1646,7 @@ local function callback_query(self, chat_id, language_code, update_data)
             for _, value in pairs(action.interactions) do
                 user.interactions[value] = nil
             end
-            self.__class:edit_message_reply_markup({
+            self.__class:delete_message({
                 chat_id = chat_id,
                 message_id = update_data.message.message_id
             })
@@ -1677,8 +1678,8 @@ local function callback_query(self, chat_id, language_code, update_data)
 
             return
         end
-
-        if action.compose._media then
+        
+        if action.compose._media and this._method == action.compose._method then
             if not this._media then
                 this._media = action.compose._media
             end
@@ -1700,7 +1701,7 @@ local function callback_query(self, chat_id, language_code, update_data)
             for _, value in pairs(action.interactions) do
                 user.interactions[value] = nil
             end
-            local ok, message = self.__class:edit_message_reply_markup({
+            local ok, message = self.__class:delete_message({
                 chat_id = chat_id,
                 message_id = update_data.message.message_id
             })
@@ -2020,27 +2021,24 @@ local function parse_update(self, update)
 
         if event then
 
-            print("é evento", event, arg, type(arg))
-
             if arg == "" then
                 arg = nil
             else
                 arg = tonumber(arg)
             end
 
-            self.__class:answer_callback_query({
-                callback_query_id = update_data.id
-            })
-
-
             if self._events[event] and self._events[event](update_data, arg) ~= false then
-                print("aqui1")
+                pcall(self.__class.answer_callback_query, self.__class, {
+                    callback_query_id = update_data.id
+                })
                 return self
             end
 
             if self._events[true] then
-                print("aqui2")
                 self._events[true](update_data, arg)
+                pcall(self.__class.answer_callback_query, self.__class, {
+                    callback_query_id = update_data.id
+                })
                 return self
             end
 
@@ -2049,7 +2047,6 @@ local function parse_update(self, update)
                 return self
             end
 
-            print("aqui3")
             error(string.format("unhandled update: %s", update._response))
             return self
 
@@ -2115,6 +2112,7 @@ local function parse_update(self, update)
             interactions = {}
         })
         user = self._users:get(chat_id)
+        user.updated_at = os.time()
     end
 
     local thread = user.thread
@@ -2150,8 +2148,8 @@ local function parse_update(self, update)
                     if type(value) == "table" and value._name then
                         value = value._name
                     end
-                    send_object(self, chat_id, language_code, value, unlist(args["#"] > 0 and args or list()))
                     user.thread = nil
+                    send_object(self, chat_id, language_code, value, unlist(args["#"] > 0 and args or list()))
                 elseif response and value == nil then
                     if response_args["#"] > 0 then
                         thread.self:say(unlist(response_args))

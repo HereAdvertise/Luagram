@@ -319,7 +319,7 @@ local function parse_compose(chat, compose, ...)
             if item._type == "run" then
 
                 compose._runtime = index + 1
-                local object, args = (function(ok, ...)
+                local result, args = (function(ok, ...)
                     if not ok then
                         compose._catch(...)
                         return
@@ -328,13 +328,13 @@ local function parse_compose(chat, compose, ...)
                 end)(pcall(item.run, compose, unlist(select("#", ...) > 0 and list(...) or compose._args)))
                 compose._runtime = nil
                 
-                if object then
+                if result then
                     
-                    if type(object) == "table" then
-                        object = object._name
+                    if type(result) == "table" and result._name then
+                        result = result._name
                     end
 
-                    send_object(compose, chat._chat_id, chat._language_code, object, unlist(args["#"] > 0 and args or (select("#", ...) > 0 and list(...) or list())))
+                    send_object(compose, chat._chat_id, chat._language_code, result, unlist(args["#"] > 0 and args or (select("#", ...) > 0 and list(...) or list())))
 
                     return false
                 end
@@ -767,8 +767,8 @@ send_object = function(self, chat_id, language_code, name, ...)
             return self
         end
 
-        this.print = function(self, ...)
-            chat:print(...)
+        this.say = function(self, ...)
+            chat:say(...)
             return self
         end
 
@@ -820,7 +820,7 @@ send_object = function(self, chat_id, language_code, name, ...)
 
         local thread = user.thread
 
-        chat.await =  function(_, match)
+        chat.listen =  function(_, match)
             if type(match) == "function" then
                 thread.match = match
             else
@@ -833,15 +833,31 @@ send_object = function(self, chat_id, language_code, name, ...)
         thread.object = object
         thread.self = chat
 
-        local ok, err = coroutine.resume(thread.main, thread.self, unlist(select("#", ...) > 0 and list(...) or object._args))
+        local result, args = (function(ok, ...)
 
-        if not ok then
-            object._catch(string.format("error on execute main session thread: %s", err))
-            return
-        end
+            if not ok then
+                object._catch(string.format("error on execute main session thread: %s", ...))
+                return
+            end
+            
+            return ..., list(select(2, ...))
+
+        end)(coroutine.resume(thread.main, thread.self, unlist(select("#", ...) > 0 and list(...) or object._args)))
 
         if coroutine.status(thread.main) == "dead" then
             user.thread = nil
+        end
+        
+        if result then
+                    
+            if type(result) == "table" and result._name then
+                result = result._name
+            end
+
+            send_object(self, chat._chat_id, chat._language_code, result, unlist(args["#"] > 0 and args or (select("#", ...) > 0 and list(...) or list())))
+            
+            user.thread = nil
+
         end
 
     else
@@ -1284,7 +1300,7 @@ addons.chat = function(self)
         return self
     end
 
-    chat.print = function(self, ...)
+    chat.say = function(self, ...)
         local texts = {}
         for index = 1, select("#", ...) do
             texts[#texts + 1] = text(self, (select(index, ...)))
@@ -1520,8 +1536,8 @@ local function callback_query(self, chat_id, language_code, update_data)
 
     local chat = self:chat(chat_id, language_code)
 
-    this.print = function(self, ...)
-        chat:print(...)
+    this.say = function(self, ...)
+        chat:say(...)
         return self
     end
 
@@ -2111,33 +2127,66 @@ local function parse_update(self, update)
             user.thread = nil
         else
 
-            local result
+            local response_args
             local valid = true
             if thread.match then
                 valid = false
-                local _ = (function(ok, ...)
+                local response, value, args = (function(ok, ...)
                     if not ok then
                         thread.object._catch(string.format("error on match session thread: %s", ...))
-                        return
+                        return nil
                     end
-                    if select("#", ...) > 0 then
-                        valid = true
-                        result = list(...)
-                    end
+                    return select("#", ...) > 0, ..., list(select(2, ...))
                 end)(pcall(thread.main, update))
+            
+                if response and value == true then
+                    valid = true
+                    response_args = args
+                elseif response and value == false then
+                    if response_args["#"] > 0 then
+                        thread.self:say(unlist(response_args))
+                    end
+                elseif response and (type(value) == "string" or type(value) == "table") then
+                    if type(value) == "table" and value._name then
+                        value = value._name
+                    end
+                    send_object(self, chat_id, language_code, value, unlist(args["#"] > 0 and args or list()))
+                    user.thread = nil
+                elseif response and value == nil then
+                    if response_args["#"] > 0 then
+                        thread.self:say(unlist(response_args))
+                    end
+                    user.thread = nil
+                end
             end
 
             if valid then
 
-                local ok, err = coroutine.resume(thread.main, unlist(result or list(update)))
+                local result, args = (function(ok, ...)
 
-                if not ok then
-                    thread.object._catch(string.format("error on execute main session thread : %s", err))
-                    return self
-                end
+                    if not ok then
+                        thread.object._catch(string.format("error on execute main session thread: %s", ...))
+                        return
+                    end
+
+                    return ..., list(select(2, ...))
+
+                end)(coroutine.resume(thread.main, update, unlist(response_args or list())))
 
                 if coroutine.status(thread.main) == "dead" then
                     user.thread = nil
+                end
+
+                if result then
+
+                    if type(result) == "table" and result._name then
+                        result = result._name
+                    end
+
+                    send_object(self, chat_id, language_code, result, unlist(args["#"] > 0 and args or list()))
+
+                    user.thread = nil
+
                 end
 
             end

@@ -288,7 +288,7 @@ local function parse_compose(chat, compose, ...)
     local row = {}
     local data = {}
 
-    local media, media_type
+    local media, media_type, media_spoiler
 
     local title, description = {}, {}
     local prices = {}
@@ -487,6 +487,7 @@ local function parse_compose(chat, compose, ...)
             -- others
             elseif item._type == "media" then
                 media = item.media
+                media_spoiler = item.spoiler
             elseif item._type == "title" then
                 title[#title + 1] = text(chat, item.title)
             elseif item._type == "description" then
@@ -627,7 +628,7 @@ print(":::::aqui",media_type)
         else
             error(string.format("unknown file type: %s", file_path))
         end
-
+print("::::::::::::@@",method)
     elseif media and media_type == "url" then
         local response, status, headers = request(compose, media)
 
@@ -688,24 +689,30 @@ print("::::::::::::::0",method)
     else
         
         data.parse_mode = "HTML"
-
+print("::::::::::::@@1")
         if method == "animation" then
+print("::::::::::::@@2")
             if media then
                 output.animation = media
+                output.has_spoiler = media_spoiler
                 if multipart then
                     compose._multipart = "animation"
                 end
             end
             output.caption = table.concat(texts)
         elseif method == "photo" then
+print("::::::::::::@@3 media", media)
             if media then
                 output.photo = media
+                output.has_spoiler = media_spoiler
                 if multipart then
                     compose._multipart = "photo"
                 end
             end
             output.caption = table.concat(texts)
+            print("::::::::::::@@3",output.caption)
         else
+print("::::::::::::@@4")
             output.text = table.concat(texts)
         end
 
@@ -729,7 +736,7 @@ print("::::::::::::::0",method)
     compose._method = method
     compose._output = output
 
-    return compose
+    return compose, interactions
 end
 
 send_object = function(self, chat_id, language_code, name, ...)
@@ -784,26 +791,26 @@ send_object = function(self, chat_id, language_code, name, ...)
                 end
             end
 
-            local response, err
+            local ok, message
 
             if result._method == "animation" then
-                response, err = self.__class:send_animation(result._output, result._multipart)
+                ok, message = self.__class:send_animation(result._output, result._multipart)
             elseif result._method == "photo" then
-                response, err = self.__class:send_photo(result._output, result._multipart)
+                ok, message = self.__class:send_photo(result._output, result._multipart)
             elseif result._method == "message" then
-                response, err = self.__class:send_message(result._output, result._multipart)
+                ok, message = self.__class:send_message(result._output, result._multipart)
             elseif result._method == "invoice" then
-                response, err = self.__class:send_invoice(result._output, result._multipart)
+                ok, message = self.__class:send_invoice(result._output, result._multipart)
             else
                 error("invalid method")
             end
 
-            if not response then
-                error(err)
+            if not ok then
+                error(message)
             end
 
             if object._dispatch then
-                object._dispatch(response)
+                object._dispatch(ok)
             end
 
         elseif result == nil then
@@ -1074,7 +1081,7 @@ addons.compose = function(self)
         return self
     end
 
-    compose.media = simple("media", "media")
+    compose.media = multiple("media", "media", "spoiler")
 
     compose.title = simple("title", "title")
 
@@ -1610,19 +1617,19 @@ local function callback_query(self, chat_id, language_code, update_data)
         return self
     end
 
-    local _ = (function(ok, result, ...)
+    local _ = (function(success, response, ...)
 
-        if not ok then
-            action.compose._catch(result)
+        if not success then
+            action.compose._catch(response)
             return
         end
 
-        if result == true then
+        if response == true then
             this = self.compose.clone(action.compose._origin)
-        elseif result == false then
+        elseif response == false then
             this:clear("buttons")
-        elseif type(result) == "string" then
-            local object = self.__class._objects[result]
+        elseif type(response) == "string" then
+            local object = self.__class._objects[response]
             if object then
                 if object._type == "compose" then
                     this = self.compose.clone(object)
@@ -1642,7 +1649,7 @@ local function callback_query(self, chat_id, language_code, update_data)
             else
                 error("object not found")
             end
-        elseif type(result) == "table" and result._type == "session" then
+        elseif type(response) == "table" and response._type == "session" then
             for _, value in pairs(action.interactions) do
                 user.interactions[value] = nil
             end
@@ -1650,21 +1657,22 @@ local function callback_query(self, chat_id, language_code, update_data)
                 chat_id = chat_id,
                 message_id = update_data.message.message_id
             })
-            send_object(self, chat_id, language_code, result._name, unlist(select("#", ...) > 0 and list(...) or action.args))
+            send_object(self, chat_id, language_code, response._name, unlist(select("#", ...) > 0 and list(...) or action.args))
             return
-        elseif type(result) == "table" and result._type == "compose" then
-            this = result
-        elseif result == nil then
+        elseif type(response) == "table" and response._type == "compose" then
+            this = response
+        elseif response == nil then
             return
         else
             error("invalid result")
         end
+        
+        for _, value in pairs(action.interactions) do
+            user.interactions[value] = nil
+        end
 
         if action.compose._transaction then
 
-            for _, value in pairs(action.interactions) do
-                user.interactions[value] = nil
-            end
             local ok, message = self.__class:edit_message_reply_markup({
                 chat_id = chat_id,
                 message_id = update_data.message.message_id
@@ -1679,70 +1687,113 @@ local function callback_query(self, chat_id, language_code, update_data)
             return
         end
         
-        if action.compose._media and this._method == action.compose._method then
-            if not this._media then
-                this._media = action.compose._media
-            end
-
-            if action.compose._media ~= this._media then
-                local ok, message = self.__class:edit_message_media({
-                    chat_id = chat_id,
-                    message_id = update_data.message.message_id,
-                    media = this._media
-                })
-                if not ok then
-                    action.compose._catch(message)
-                    return
+        
+        --[[
+        aqui é bem dificil
+        
+        se mensagem antiga conter method
+        e a nova não conter method (for message)
+        editar mensagem atual para colocar o mesmo metodo da antiga
+        
+        se a mensagem antiga n~sao conter method (for message)
+        e a nova conter
+        apagar antiga e enviar mensagem nova
+        
+        se a mensagem antiga tiver um method diferente da mensagem nova
+        apagar mensagem antiga e enviar nova
+        
+        se a mensagem antiga tiver o mesmo method da mensagem nova
+        editar
+        
+        
+        ]]
+        
+        if action.compose._media then
+            local media
+            for index = #this, 1, -1 do
+                if type(this[index]) == "table" and this[index]._type == "media" then
+                    media = this[index].media
+                    break
                 end
             end
-
-        elseif not action.compose._media and this._media then
-
-            for _, value in pairs(action.interactions) do
-                user.interactions[value] = nil
+            if not media then
+                this:media(action.compose._media)
             end
-            local ok, message = self.__class:delete_message({
-                chat_id = chat_id,
-                message_id = update_data.message.message_id
-            })
-            if not ok then
-                action.compose._catch(message)
-                return
-            end
-            send_object(self, chat_id, language_code, this._name, unlist(select("#", ...) > 0 and list(...) or action.args))
+        end
 
+        local result, err = parse_compose(chat, this:clone(), unlist(select("#", ...) > 0 and list(...) or action.args))
+        if not result then
+            action.compose._catch(string.format("parser error: %s", err))
             return
         end
-
-        for _, value in pairs(action.interactions) do
-            user.interactions[value] = nil
-        end
-
-        local compose = parse_compose(chat, this, unlist(select("#", ...) > 0 and list(...) or action.args))
 
         local ok, message
 
-        if not compose then
-            action.compose._catch("parser error")
-            return
-        end
-
-        if this._method == "message" then
-            ok, message = self.__class:edit_message_text({
+        if action.compose._method == "message" and result._method == "message" then
+            print("@@@@@@@@@@@@@@@@1")
+            
+            result._output.chat_id = chat_id
+            result._output.message_id = update_data.message.message_id
+            --if result._output.text == action.compose._output.text then
+                ok, message = self.__class:edit_message_text(result._output)
+            --else
+            --    ok, message = self.__class:edit_message_reply_markup(result._output)
+            --end
+        elseif action.compose._method ~= "message" and result._method == "message" then
+            print("@@@@@@@@@@@@@@@@2")
+ --           this:media(action.compose._media)
+--            this[#this + 1] = {
+--                _type = "media",
+--                media = action.compose._media
+--            }
+--manualmente editar aqui
+            --result._output.caption = result._output.text
+            --result._output.text = nil
+            result._output.chat_id = chat_id
+            result._output.message_id = update_data.message.message_id
+            --if result._output.text == action.compose._output.text then
+                ok, message = self.__class:edit_message_caption(result._output)
+            --else
+            --    ok, message = self.__class:edit_message_reply_markup(result._output)
+            --end
+        elseif (action.compose._method == "message" and result._method ~= "message") or (action.compose._method ~= result._method) then
+            print("@@@@@@@@@@@@@@@@3")
+            self.__class:delete_message({
                 chat_id = chat_id,
-                message_id = update_data.message.message_id,
-                text = compose._output.text,
-                parse_mode = compose._output.parse_mode,
-                reply_markup = compose._output.reply_markup
+                message_id = update_data.message.message_id
             })
-        else
-            ok, message = self.__class:edit_message_caption({
-                chat_id = chat_id,
-                message_id = update_data.message.message_id,
-                caption = compose._output.caption,
-                parse_mode = compose._output.parse_mode,
-                reply_markup = compose._output.reply_markup
-            })
+            if result._method == "animation" then
+                ok, message = self.__class:send_animation(result._output, result._multipart)
+            elseif result._method == "photo" then
+                ok, message = self.__class:send_photo(result._output, result._multipart)
+            elseif result._method == "message" then
+                ok, message = self.__class:send_message(result._output, result._multipart)
+            elseif result._method == "invoice" then
+                ok, message = self.__class:send_invoice(result._output, result._multipart)
+            else
+                error("invalid method")
+            end
+        elseif action.compose._method == result._method then
+            print("@@@@@@@@@@@@@@@@4",action.compose._method,result._method)
+            -- editar
+--            self.__class:edit_message_media({
+--                chat_id = chat_id,
+--                message_id = update_data.message.message_id,
+--                media = {
+--                    type = result._method,
+--                    media = result._media --attach://<file_attach_name>
+--                }
+--            })
+            result._output.media = result._output
+            result._output.media.type = result._method
+            if result._multipart then
+                result._output.media.media = string.format("attach://%s", result._multipart)
+            else
+                result._output.media.media = result._media
+            end
+            result._output.chat_id = chat_id
+            result._output.message_id = update_data.message.message_id
+            ok, message = self.__class:edit_message_caption(result._output)
         end
 
         if not ok then

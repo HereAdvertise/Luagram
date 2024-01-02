@@ -1575,7 +1575,7 @@ local function callback_query(self, chat_id, language_code, update_data)
             button = true, action = true, location = true, transaction = true, row = true
         }
         local texts ={
-            text = true, bold = true, italic = true, underline = true, spoiler = true, strike = true, link = true, mention = true, mono = true, pre = true, line = true, html = true, quote = true, close = true
+            text = true, bold = true, italic = true, underline = true, spoiler = true, strike = true, link = true, mention = true, mono = true, pre = true, line = true, html = true, quote = true, close = true, title = true, description = true, price = true
         }
         for index = 1, #self do
             local item = self[index]
@@ -1670,19 +1670,49 @@ local function callback_query(self, chat_id, language_code, update_data)
         for _, value in pairs(action.interactions) do
             user.interactions[value] = nil
         end
+        
+        if action.compose._media then
+            local media
+            for index = #this, 1, -1 do
+                if type(this[index]) == "table" and this[index]._type == "media" then
+                    media = this[index].media
+                    break
+                end
+            end
+            if not media then
+                this:media(action.compose._media)
+            end
+        end
+
+        local result, err = parse_compose(chat, this:clone(), unlist(select("#", ...) > 0 and list(...) or action.args))
+        if not result then
+            action.compose._catch(string.format("parser error: %s", err))
+            return
+        end
+
+        local ok, message
 
         if action.compose._transaction then
 
-            local ok, message = self.__class:edit_message_reply_markup({
+            self.__class:delete_message({
                 chat_id = chat_id,
                 message_id = update_data.message.message_id
             })
+            if result._method == "animation" then
+                ok, message = self.__class:send_animation(result._output, result._multipart)
+            elseif result._method == "photo" then
+                ok, message = self.__class:send_photo(result._output, result._multipart)
+            elseif result._method == "message" then
+                ok, message = self.__class:send_message(result._output, result._multipart)
+            elseif result._method == "invoice" then
+                ok, message = self.__class:send_invoice(result._output, result._multipart)
+            else
+                error("invalid method")
+            end
+
             if not ok then
                 action.compose._catch(message)
-                return
             end
-            
-            send_object(self, chat_id, language_code, this._name, unlist(select("#", ...) > 0 and list(...) or action.args))
 
             return
         end
@@ -1708,26 +1738,7 @@ local function callback_query(self, chat_id, language_code, update_data)
         
         ]]
         
-        if action.compose._media then
-            local media
-            for index = #this, 1, -1 do
-                if type(this[index]) == "table" and this[index]._type == "media" then
-                    media = this[index].media
-                    break
-                end
-            end
-            if not media then
-                this:media(action.compose._media)
-            end
-        end
 
-        local result, err = parse_compose(chat, this:clone(), unlist(select("#", ...) > 0 and list(...) or action.args))
-        if not result then
-            action.compose._catch(string.format("parser error: %s", err))
-            return
-        end
-
-        local ok, message
 
         if action.compose._method == "message" and result._method == "message" then
             print("@@@@@@@@@@@@@@@@1")

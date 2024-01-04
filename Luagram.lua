@@ -2062,7 +2062,7 @@ local function parse_update(self, update)
     assert(update.update_id, "invalid update")
 
     for key, value in pairs(update) do
-        if key ~= "update_id" then
+        if key ~= "update_id" and key ~= "_response" then
             update_type = key
             update_data = value
             break

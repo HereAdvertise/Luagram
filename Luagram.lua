@@ -166,16 +166,16 @@ local function telegram(self, method, data, multipart)
         end
     end
     if not multipart then
-        print("-->", method, body)
+        stderr("-->".. tostring(method).. tostring(body))
     else
-        print("--> (multipart)", method)
+        stderr("--> (multipart)".. tostring(method))
     end
     local response, response_status, response_headers = request(self, api, {
         method = "POST",
         body = body,
         headers = headers
     })
-    print("<--", response)
+    stderr("<--".. tostring(response))
     local ok, result = pcall(_json_decoder, response)
     if ok and type(result) == "table" then
         if not result.ok then

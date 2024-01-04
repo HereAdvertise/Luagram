@@ -24,7 +24,10 @@ local function detect_env()
     local ok
     ok = pcall(_G.GetRedbeanVersion)
     if ok then
-        http_provider = _G.Fetch
+        http_provider = function(...)
+            local status, headers, body = _G.Fetch(...)
+            return body, status, headers
+        end
         json_encoder = _G.EncodeJson
         json_decoder = _G.DecodeJson
         return
@@ -68,15 +71,6 @@ end
 local function stdout(message)
     print(message)
     io.stdout:write("Luagram: ", os.date("!%Y-%m-%d %H:%M:%S GMT: "), message, "\n")
-end
-
-
-local print = function(...)
-    local messages = {}
-    for index = 1, select("#", ...) do
-        messages[#messages + 1] = tostring(select(index, ...))
-    end
-    stdout(table.concat(messages, "\t"))
 end
 
 local function stderr(message)

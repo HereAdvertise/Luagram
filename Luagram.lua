@@ -70,6 +70,15 @@ local function stdout(message)
     io.stdout:write("Luagram: ", os.date("!%Y-%m-%d %H:%M:%S GMT: "), message, "\n")
 end
 
+
+local print = function(...)
+    local messages = {}
+    for index = 1, select("#", ...) do
+        messages[#messages + 1] = tostring(select(index, ...))
+    end
+    stdout(table.concat(messages, "\t"))
+end
+
 local function stderr(message)
     print("[Error] ", message)
     io.stderr:write("Luagram: ", os.date("!%Y-%m-%d %H:%M:%S GMT: "), "[Error] ", message, "\n")

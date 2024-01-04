@@ -1416,6 +1416,8 @@ function Luagram.new(options)
     self.__class = self
 
     self._token = options.token
+    self._api = options.api
+    self._headers = options.headers
     
     if options.transactions then
         self._transaction_report_to = options.transactions.report_to

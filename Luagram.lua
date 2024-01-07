@@ -70,12 +70,12 @@ end
 
 local function stdout(message)
     print(message)
-    io.stdout:write("Luagram: ", os.date("!%Y-%m-%d %H:%M:%S GMT: "), message, "\n")
+    io.stdout:write("Luagram: ", os.date("!%Y-%m-%d %H:%M:%S GMT: "), tostring(message), "\n")
 end
 
 local function stderr(message)
     print("[Error] ", message)
-    io.stderr:write("Luagram: ", os.date("!%Y-%m-%d %H:%M:%S GMT: "), "[Error] ", message, "\n")
+    io.stderr:write("Luagram: ", os.date("!%Y-%m-%d %H:%M:%S GMT: "), "[Error] ", tostring(message), "\n")
 end
 
 local function request(self, url, options)

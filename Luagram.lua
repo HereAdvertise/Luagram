@@ -175,7 +175,7 @@ local function telegram(self, method, data, multipart)
         body = body,
         headers = headers
     })
-    stderr("<--".. tostring(response))
+    stderr("<--".. tostring(response)..tostring(response_status))
     local ok, result = pcall(_json_decoder, response)
     if ok and type(result) == "table" then
         if not result.ok then

@@ -2203,7 +2203,7 @@ local function parse_update(self, update)
                         return nil
                     end
                     return select("#", ...) > 0, ..., list(select(2, ...))
-                end)(pcall(thread.main, update))
+                end)(pcall(thread.match, update))
             
                 if response and value == true then
                     valid = true

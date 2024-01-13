@@ -1394,6 +1394,9 @@ end
 local Luagram = {}
 
 function Luagram.new(options)
+
+    stderr("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@new restarded")
+    
     local self = setmetatable({}, Luagram)
 
     if type(options) == "string" then

@@ -1395,7 +1395,7 @@ local Luagram = {}
 
 function Luagram.new(options)
 
-    stderr("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@new restarded")
+    Log(kLogWarn,"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@new restarded")
     
     local self = setmetatable({}, Luagram)
 

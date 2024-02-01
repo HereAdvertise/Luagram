@@ -11,8 +11,8 @@ local function unlist(value)
 end
 
 local function id(self)
-    self.__class._ids = self.__class._ids + 1
-    return self.__class._ids
+    self.__super._ids = self.__super._ids + 1
+    return self.__super._ids
 end
 
 local http_provider, json_encoder, json_decoder
@@ -79,7 +79,7 @@ local function stderr(message)
 end
 
 local function request(self, url, options)
-    local _http_provider = self.__class._http_provider or http_provider
+    local _http_provider = self.__super._http_provider or http_provider
     local response, response_status, headers = _http_provider(url, options)
     local response_headers
     if response_status == 200 and type(headers) == "table" then
@@ -111,10 +111,10 @@ local mimetypes = {
 }
 
 local function telegram(self, method, data, multipart)
-    local _json_encoder = self.__class._json_encoder or json_encoder
-    local _json_decoder = self.__class._json_decoder or json_decoder
-    local api = self.__class._api or "https://api.telegram.org/bot%s/%s"
-    api = string.format(api, self.__class._token, string.gsub(method, "%W", ""))
+    local _json_encoder = self.__super._json_encoder or json_encoder
+    local _json_decoder = self.__super._json_decoder or json_decoder
+    local api = self.__super._api or "https://api.telegram.org/bot%s/%s"
+    api = string.format(api, self.__super._token, string.gsub(method, "%W", ""))
     local headers, body
     if multipart then
         body = {}
@@ -160,8 +160,8 @@ local function telegram(self, method, data, multipart)
             ["content-length"] = #body
         }
     end
-    if self.__class._headers then
-        for key, value in pairs(self.__class._headers) do
+    if self.__super._headers then
+        for key, value in pairs(self.__super._headers) do
             headers[string.lower(key)] = value
         end
     end
@@ -176,7 +176,7 @@ local function telegram(self, method, data, multipart)
         headers = headers
     })
     stderr("<--".. tostring(response)..tostring(response_status))
-    local ok, result = pcall(_json_decoder, response)
+    local ok, result, err = pcall(_json_decoder, response)
     if ok and type(result) == "table" then
         if not result.ok then
             return false, string.format("%s: %s", result.error_code, result.description), response, response_status, response_headers
@@ -187,7 +187,7 @@ local function telegram(self, method, data, multipart)
         end
         return result, response, response_status, response_headers
     end
-    return nil, result, response, response_status, response_headers
+    return nil, tostring(result or err), response, response_status, response_headers
 end
 
 local function escape(text)
@@ -200,7 +200,7 @@ local function escape(text)
 end
 
 local function locale(self, value, number)
-    local locales = self.__class._locales
+    local locales = self.__super._locales
     local result = value
     if type(value) == "string" then
         if locales and self._language_code then
@@ -271,11 +271,12 @@ local function catch_error(...)
 end
 
 local send_object
+local media_cache = {}
 
 local function parse_compose(chat, compose, ...)
     print("entrou no compose parser@@@@@@")
 
-    local users = chat.__class._users
+    local users = chat.__super._users
 
     local user = users:get(chat._chat_id)
 
@@ -331,8 +332,9 @@ local function parse_compose(chat, compose, ...)
                 end)(pcall(item.run, compose, unlist(select("#", ...) > 0 and list(...) or compose._args)))
                 compose._runtime = nil
                 
-                if result then
-                    
+                if result == false then
+                    return false
+                elseif result then
                     if type(result) == "table" and result._name then
                         result = result._name
                     end
@@ -514,7 +516,7 @@ local function parse_compose(chat, compose, ...)
                     callback_data = event
                 }
             elseif item._type == "action" then
-                if type(item.action) == "string" then
+                if type(item.action) ~= "function" then
                     local action = item.action
                     item.action = function(_, ...)
                         return action, ...
@@ -614,63 +616,76 @@ print(":::::aqui",media_type)
     end
 
     if media and media_type == "id" then
-        local response, err = chat.__class:get_file({
-            file_id = media
-        })
-
-        if not response then
-            error(err)
-        end
-
-        local file_path = string.lower(assert(response.file_path, "file_path not found"))
-
-        if file_path:match("animations") then
-            method = "animation"
-        elseif file_path:match("photos") then
-            method = "photo"
+        if media_cache[media] then
+            method = media_cache[media] 
         else
-            error(string.format("unknown file type: %s", file_path))
-        end
-print("::::::::::::@@",method)
-    elseif media and media_type == "url" then
-        local response, status, headers = request(compose, media)
-
-        if not response then
-            error(status)
-        end
-
-        if status ~= 200 then
-            error(string.format("unable to fetch media (%s): %s", media, status))
-        end
-
-        local content_type
-
-        if type(headers) == "table" and headers["content-type"] then
-            content_type = string.lower(headers["content-type"])
-
-            if content_type == "image/gif" then
+            local response, err = chat.__super:get_file({
+                file_id = media
+            })
+    
+            if not response then
+                error(err)
+            end
+    
+            local file_path = string.lower(assert(response.file_path, "file_path not found"))
+    
+            if file_path:match("animations") then
                 method = "animation"
-            elseif content_type == "image/png" or content_type == "image/jpg" or content_type == "image/jpeg" then
+            elseif file_path:match("photos") then
                 method = "photo"
             else
-                error(string.format("unknown file content type (%s): %s", media, content_type))
+                error(string.format("unknown file type: %s", file_path))
             end
-        else
-            error(string.format("content type not found for media %s", media))
+            media_cache[media]  = method
         end
 
+    elseif media and media_type == "url" then
+
+        if media_cache[media] then
+            method = media_cache[media] 
+        else
+            local response, status, headers = request(compose, media)
+
+            if not response then
+                error(status)
+            end
+
+            if status ~= 200 then
+                error(string.format("unable to fetch media (%s): %s", media, status))
+            end
+
+            local content_type
+
+            if type(headers) == "table" and headers["content-type"] then
+                content_type = string.lower(headers["content-type"])
+
+                if content_type == "image/gif" then
+                    method = "animation"
+                elseif content_type == "image/png" or content_type == "image/jpg" or content_type == "image/jpeg" then
+                    method = "photo"
+                else
+                    error(string.format("unknown file content type (%s): %s", media, content_type))
+                end
+            else
+                error(string.format("content type not found for media %s", media))
+            end
+            media_cache[media]  = method
+        end
     elseif media and media_type == "path" then
-
-        local extension = string.lower(assert(string.match(media, "([^%.]+)$"), "no extension"))
-
-        if extension == "gif" then
-            method = "animation"
-        elseif extension == "png" or extension == "jpg" or extension == "jpeg" or extension == "webp" then
-            method = "photo"
+        if media_cache[media] then
+            method = media_cache[media] 
         else
-            error(string.format("unknown media type: %s", media))
+            local extension = string.lower(assert(string.match(media, "([^%.]+)$"), "no extension"))
+
+            if extension == "gif" then
+                method = "animation"
+            elseif extension == "png" or extension == "jpg" or extension == "jpeg" or extension == "webp" then
+                method = "photo"
+            else
+                error(string.format("unknown media type: %s", media))
+            end
+            media_cache[media]  = method
         end
-print("::::::::::::::0",method)
     elseif media then
         error(string.format("unknown media type: %s", tostring(media)))
     end
@@ -686,8 +701,8 @@ print("::::::::::::::0",method)
         output.payload = payload
         output.start_parameter = payload
         output.protect_content = true
-        output.currency = chat.__class._transaction_currency
-        output.provider_token = chat.__class._transaction_provider_token
+        output.currency = chat.__super._transaction_currency
+        output.provider_token = chat.__super._transaction_provider_token
         output.prices = prices
     else
         
@@ -744,8 +759,8 @@ end
 
 send_object = function(self, chat_id, language_code, name, ...)
 
-    local users = self.__class._users
-    local objects = self.__class._objects
+    local users = self.__super._users
+    local objects = self.__super._objects
 
     local user = users:get(chat_id)
 
@@ -755,8 +770,8 @@ send_object = function(self, chat_id, language_code, name, ...)
             interactions = {}
         })
         user = users:get(chat_id)
-        user.updated_at = os.time()
     end
+    user.updated_at = os.time()
 
     local object = objects[name]
 
@@ -764,7 +779,7 @@ send_object = function(self, chat_id, language_code, name, ...)
         error(string.format("object not found: %s", name))
     end
 
-    local chat = self.__class:chat(chat_id, language_code)
+    local chat = self.__super:chat(chat_id, language_code)
 
     if object._type == "compose" then
 
@@ -787,8 +802,8 @@ send_object = function(self, chat_id, language_code, name, ...)
 
         if result then
 
-            if object._predispatch then
-                local parsed_result = object._predispatch(result)
+            for index = 1, #object._predispatch do
+                local parsed_result = object._predispatch[index](result)
                 if type(parsed_result) == "table" then
                     result = parsed_result
                 end
@@ -797,13 +812,13 @@ send_object = function(self, chat_id, language_code, name, ...)
             local ok, message
 
             if result._method == "animation" then
-                ok, message = self.__class:send_animation(result._output, result._multipart)
+                ok, message = self.__super:send_animation(result._output, result._multipart)
             elseif result._method == "photo" then
-                ok, message = self.__class:send_photo(result._output, result._multipart)
+                ok, message = self.__super:send_photo(result._output, result._multipart)
             elseif result._method == "message" then
-                ok, message = self.__class:send_message(result._output, result._multipart)
+                ok, message = self.__super:send_message(result._output, result._multipart)
             elseif result._method == "invoice" then
-                ok, message = self.__class:send_invoice(result._output, result._multipart)
+                ok, message = self.__super:send_invoice(result._output, result._multipart)
             else
                 error("invalid method")
             end
@@ -812,8 +827,8 @@ send_object = function(self, chat_id, language_code, name, ...)
                 error(message)
             end
 
-            if object._dispatch then
-                object._dispatch(ok)
+            for index = 1, #object._dispatch do
+                object._dispatch[index](ok)
             end
 
         elseif result == nil then
@@ -885,19 +900,23 @@ local addons = {}
 
 addons.compose = function(self)
 
-    self:class("compose", function(self, name, ...)
-        if name == nil then
-            name = "/start"
-        end
-
+    self:object("compose", function(self, name, ...)
         self._type = "compose"
         self._id = id(self)
+        if name == true then
+            self._name = "/start"
+        elseif not name then
+            self._name = tostring(self._id)
+        else
+            self._name = name
+        end
+        if name ~= false then
+            self.__super._objects[name] = self
+        end
+        self._dispatch = {}
+        self._predispatch = {}
         self._args = list(...)
         self:catch(catch_error)
-        self._name = name
-        if name ~= false then
-            self.__class._objects[name] = self
-        end
     end, function(self, key)
         local value = rawget(getmetatable(self), key)
         if value == nil and type(key) == "string" then
@@ -917,9 +936,9 @@ addons.compose = function(self)
     local compose = self.compose
 
     compose.clone = function(self)
-        local clone = self.__class:compose(false)
+        local clone = self.__super:compose(false)
         for key, value in pairs(self) do
-            if key ~= "_id" and key ~= "__class" then
+            if key ~= "_id" and key ~= "__super" then
                 if type(value) == "table" and not value._runtime then
                     local copy = {}
                     for copy_key, copy_value in pairs(value) do
@@ -1022,13 +1041,13 @@ addons.compose = function(self)
     end
 
     compose.mention = function(self, ...)
-        local index, user, name = ...
+        local index, name, user = ...
         local _index
         if type(index) == "number" and select("#", ...) > 1 then
             _index = index
         else
-            name = user
-            user = index
+            user = name
+            name = index
         end
         if tonumber(user) then
             user = string.format("tg://user?id=%s", user)
@@ -1211,32 +1230,16 @@ addons.compose = function(self)
     compose.dispatch = function(self, dispatch, before)
         if before then
             if dispatch == false then
-                self._predispatch = nil
+                self._predispatch = {}
                 return self
             end
-            if self._predispatch then
-                local _predispatch = self._predispatch
-                self._predispatch = function(...)
-                    _predispatch(...)
-                    return dispatch(...)
-                end
-            else
-                self._predispatch = dispatch
-            end
+            self._predispatch[#self._predispatch + 1] = dispatch
         else
             if dispatch == false then
-                self._dispatch = nil
+                self._dispatch = {}
                 return self
             end
-            if self._dispatch then
-                local _dispatch = self._dispatch
-                self._dispatch = function(...)
-                    _dispatch(...)
-                    return dispatch(...)
-                end
-            else
-                self._dispatch = dispatch
-            end
+            self._dispatch[#self._dispatch + 1] = dispatch
         end
         return self
     end
@@ -1253,7 +1256,7 @@ end
 
 addons.session = function(self)
 
-    self:class("session", function(self, name, ...)
+    self:object("session", function(self, name, ...)
         if name == nil then
             name = "/start"
         end
@@ -1263,7 +1266,7 @@ addons.session = function(self)
         self._name = name
         self._args = list(...)
         self:catch(catch_error)
-        self.__class._objects[name] = self
+        self.__super._objects[name] = self
     end)
 
     local session = self.session
@@ -1285,7 +1288,7 @@ end
 
 addons.chat = function(self)
 
-    self:class("chat", function(self, chat_id, language_code)
+    self:object("chat", function(self, chat_id, language_code)
         self._type = "chat"
         self._chat_id = chat_id
         self._language_code = language_code
@@ -1316,8 +1319,9 @@ addons.chat = function(self)
         for index = 1, select("#", ...) do
             texts[#texts + 1] = text(self, (select(index, ...)))
         end
-        self.__class:send_message({
+        self.__super:send_message({
             chat_id = self._chat_id,
+            parser_mode = "HTML",
             text = table.concat(texts, "\n")
         })
         return self
@@ -1326,6 +1330,16 @@ addons.chat = function(self)
     chat.text = function(self, value)
         return text(self, value)
     end
+
+    chat.id = function(self)
+        return self._chat_id
+    end
+
+    chat.language = function(self)
+        return self._language_code
+    end
+
+end
 
     return self
 end
@@ -1416,16 +1430,16 @@ function Luagram.new(options)
     self._http_provider = options.http_provider
     self._json_encoder = options.json_encoder
     self._json_decoder = options.json_decoder
-    self.__class = self
+    self.__super = self
 
     self._token = options.token
     self._api = options.api
     self._headers = options.headers
     
     if options.transactions then
-        self._transaction_report_to = options.transactions.report_to
-        self._transaction_currency = options.transactions.currency
-        self._transaction_provider_token = options.transactions.provider_token
+        self._transaction_report_to = assert(options.transactions.report_to, "required option: transactions.report_to")
+        self._transaction_currency = assert(options.transactions.currency, "required option: transactions.currency")
+        self._transaction_provider_token = assert(options.transactions.provider_token, "required option: transactions.provider_token")
     end
 
     self:addon("compose")
@@ -1441,14 +1455,14 @@ function Luagram.new(options)
     return self
 end
 
-function Luagram:class(name, new, index)
+function Luagram:object(name, new, index)
     local class = {}
     class.__index = index or class
     self[name] = setmetatable({}, {
         __call = function(_, base, ...)
             local self = setmetatable({}, class)
             self.__name = name
-            self.__class = base
+            self.__super = base
             return (new and new(self, ...)) or self
         end,
         __index = class,
@@ -1537,7 +1551,7 @@ local function callback_query(self, chat_id, language_code, update_data)
 
     if action.lock then
         answer.callback_query_id = update_data.id
-        self.__class:answer_callback_query(answer)
+        self.__super:answer_callback_query(answer)
         return true
     end
 
@@ -1566,12 +1580,21 @@ local function callback_query(self, chat_id, language_code, update_data)
         return self._update_data, self._update_type
     end
 
-    this.this = function(self)
+    this.this = function(self, label, action, ...)
         for index = 1, #self do
             print(action.id)
             print(self[index].id)
             if type(self[index]) == "table" and self[index]._type == "action" and self[index].id == action.id then
                 self[index].index = index
+                if label ~= nil then
+                    self[index].label = label
+                end
+                if action ~= nil then
+                    self[index].action = action
+                end
+                if select("#", ...) > 0 then
+                    self[index].args = list(...)
+                end
                 return self[index]
             end
         end
@@ -1637,31 +1660,31 @@ local function callback_query(self, chat_id, language_code, update_data)
         elseif response == false then
             this:clear("buttons")
         elseif type(response) == "string" then
-            local object = self.__class._objects[response]
+            local object = self.__super._objects[response]
             if object then
                 if object._type == "compose" then
                     this = self.compose.clone(object)
-                elseif  object._type == "session" then
+                elseif object._type == "session" then
                     for _, value in pairs(action.interactions) do
                         user.interactions[value] = nil
                     end
-                    self.__class:delete_message({
+                    self.__super:delete_message({
                         chat_id = chat_id,
                         message_id = update_data.message.message_id
                     })
                     send_object(self, chat_id, language_code, object._name, unlist(select("#", ...) > 0 and list(...) or action.args))
                     return
                 else
-                   error("invalid object")
+                   error(string.format("invalid object: %s", object._type))
                 end
             else
-                error("object not found")
+                error(string.format("object not found: %s", response))
             end
         elseif type(response) == "table" and response._type == "session" then
             for _, value in pairs(action.interactions) do
                 user.interactions[value] = nil
             end
-            self.__class:delete_message({
+            self.__super:delete_message({
                 chat_id = chat_id,
                 message_id = update_data.message.message_id
             })
@@ -1702,18 +1725,18 @@ local function callback_query(self, chat_id, language_code, update_data)
 
         if action.compose._transaction then
 
-            self.__class:delete_message({
+            self.__super:delete_message({
                 chat_id = chat_id,
                 message_id = update_data.message.message_id
             })
             if result._method == "animation" then
-                ok, message = self.__class:send_animation(result._output, result._multipart)
+                ok, message = self.__super:send_animation(result._output, result._multipart)
             elseif result._method == "photo" then
-                ok, message = self.__class:send_photo(result._output, result._multipart)
+                ok, message = self.__super:send_photo(result._output, result._multipart)
             elseif result._method == "message" then
-                ok, message = self.__class:send_message(result._output, result._multipart)
+                ok, message = self.__super:send_message(result._output, result._multipart)
             elseif result._method == "invoice" then
-                ok, message = self.__class:send_invoice(result._output, result._multipart)
+                ok, message = self.__super:send_invoice(result._output, result._multipart)
             else
                 error("invalid method")
             end
@@ -1724,85 +1747,32 @@ local function callback_query(self, chat_id, language_code, update_data)
 
             return
         end
-        
-        
-        --[[
-        aqui é bem dificil
-        
-        se mensagem antiga conter method
-        e a nova não conter method (for message)
-        editar mensagem atual para colocar o mesmo metodo da antiga
-        
-        se a mensagem antiga n~sao conter method (for message)
-        e a nova conter
-        apagar antiga e enviar mensagem nova
-        
-        se a mensagem antiga tiver um method diferente da mensagem nova
-        apagar mensagem antiga e enviar nova
-        
-        se a mensagem antiga tiver o mesmo method da mensagem nova
-        editar
-        
-        
-        ]]
-        
-
 
         if action.compose._method == "message" and result._method == "message" then
-            print("@@@@@@@@@@@@@@@@1")
-            
             result._output.chat_id = chat_id
             result._output.message_id = update_data.message.message_id
-            --if result._output.text == action.compose._output.text then
-                ok, message = self.__class:edit_message_text(result._output)
-            --else
-            --    ok, message = self.__class:edit_message_reply_markup(result._output)
-            --end
+            ok, message = self.__super:edit_message_text(result._output)
         elseif action.compose._method ~= "message" and result._method == "message" then
-            print("@@@@@@@@@@@@@@@@2")
- --           this:media(action.compose._media)
---            this[#this + 1] = {
---                _type = "media",
---                media = action.compose._media
---            }
---manualmente editar aqui
-            --result._output.caption = result._output.text
-            --result._output.text = nil
             result._output.chat_id = chat_id
             result._output.message_id = update_data.message.message_id
-            --if result._output.text == action.compose._output.text then
-                ok, message = self.__class:edit_message_caption(result._output)
-            --else
-            --    ok, message = self.__class:edit_message_reply_markup(result._output)
-            --end
+            ok, message = self.__super:edit_message_caption(result._output)
         elseif (action.compose._method == "message" and result._method ~= "message") or (action.compose._method ~= result._method) then
-            print("@@@@@@@@@@@@@@@@3")
-            self.__class:delete_message({
+            self.__super:delete_message({
                 chat_id = chat_id,
                 message_id = update_data.message.message_id
             })
             if result._method == "animation" then
-                ok, message = self.__class:send_animation(result._output, result._multipart)
+                ok, message = self.__super:send_animation(result._output, result._multipart)
             elseif result._method == "photo" then
-                ok, message = self.__class:send_photo(result._output, result._multipart)
+                ok, message = self.__super:send_photo(result._output, result._multipart)
             elseif result._method == "message" then
-                ok, message = self.__class:send_message(result._output, result._multipart)
+                ok, message = self.__super:send_message(result._output, result._multipart)
             elseif result._method == "invoice" then
-                ok, message = self.__class:send_invoice(result._output, result._multipart)
+                ok, message = self.__super:send_invoice(result._output, result._multipart)
             else
                 error("invalid method")
             end
         elseif action.compose._method == result._method then
-            print("@@@@@@@@@@@@@@@@4",action.compose._method,result._method)
-            -- editar
---            self.__class:edit_message_media({
---                chat_id = chat_id,
---                message_id = update_data.message.message_id,
---                media = {
---                    type = result._method,
---                    media = result._media --attach://<file_attach_name>
---                }
---            })
             result._output.media = result._output
             result._output.media.type = result._method
             if result._multipart then
@@ -1812,7 +1782,7 @@ local function callback_query(self, chat_id, language_code, update_data)
             end
             result._output.chat_id = chat_id
             result._output.message_id = update_data.message.message_id
-            ok, message = self.__class:edit_message_caption(result._output)
+            ok, message = self.__super:edit_message_caption(result._output)
         end
 
         if not ok then
@@ -1827,7 +1797,7 @@ local function callback_query(self, chat_id, language_code, update_data)
         answer.text = table.concat(answer.text)
     end
     answer.callback_query_id = update_data.id
-    self.__class:answer_callback_query(answer)
+    self.__super:answer_callback_query(answer)
 
     return true
 end
@@ -1867,7 +1837,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
     local _ = (function(ok, ...)
 
         if not ok then
-            self.__class:answer_shipping_query({
+            self.__super:answer_shipping_query({
                 shipping_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
@@ -1879,14 +1849,14 @@ local function shipping_query(self, chat_id, language_code, update_data)
         local result = ...
 
         if type(result) == "string" then
-            self.__class:answer_shipping_query({
+            self.__super:answer_shipping_query({
                 shipping_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, result)
             })
             return
         elseif result == false then
-            self.__class:answer_shipping_query({
+            self.__super:answer_shipping_query({
                 shipping_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, {"Sorry, delivery to your desired address is unavailable."})
@@ -1904,7 +1874,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
                         prices = current.prices
                     }
                 else
-                    self.__class:answer_shipping_query({
+                    self.__super:answer_shipping_query({
                         shipping_query_id = update_data.id,
                         ok = false,
                         error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
@@ -1913,7 +1883,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
                     return
                 end
             end
-            self.__class:answer_shipping_query({
+            self.__super:answer_shipping_query({
                 shipping_query_id = update_data.id,
                 ok = true,
                 shipping_options = options
@@ -1921,7 +1891,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
             return
         end
         
-        self.__class:answer_shipping_query({
+        self.__super:answer_shipping_query({
             shipping_query_id = update_data.id,
             ok = false,
             error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
@@ -1969,7 +1939,7 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
     local _ = (function(ok, ...)
 
         if not ok then
-            self.__class:answer_pre_checkout_query({
+            self.__super:answer_pre_checkout_query({
                 pre_checkout_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
@@ -1981,28 +1951,28 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
         local result = ...
 
         if type(result) == "string" then
-            self.__class:answer_pre_checkout_query({
+            self.__super:answer_pre_checkout_query({
                 pre_checkout_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, result)
             })
             return
         elseif result == false then
-            self.__class:answer_pre_checkout_query({
+            self.__super:answer_pre_checkout_query({
                 pre_checkout_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, {"Sorry, it won't be possible to complete the payment for the item you selected. Please try again in the bot."})
             })
             return
         elseif result == true then
-            self.__class:answer_pre_checkout_query({
+            self.__super:answer_pre_checkout_query({
                 pre_checkout_query_id = update_data.id,
                 ok = true
             })
             return
         end
         
-        self.__class:answer_pre_checkout_query({
+        self.__super:answer_pre_checkout_query({
             pre_checkout_query_id = update_data.id,
             ok = false,
             error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
@@ -2045,9 +2015,7 @@ local function successful_payment(self, chat_id, language_code, update_data)
         return update_data, "successful_payment"
     end
 
-    pcall(transaction.transaction, this, unlist(transaction.args))
-
-    return true
+    return true, pcall(transaction.transaction, this, unlist(transaction.args))
 end
 
 local function chat_id(update_data, update_type)
@@ -2099,7 +2067,7 @@ local function parse_update(self, update)
             end
 
             if self._events[event] and self._events[event](update_data, arg) ~= false then
-                pcall(self.__class.answer_callback_query, self.__class, {
+                pcall(self.__super.answer_callback_query, self.__super, {
                     callback_query_id = update_data.id
                 })
                 return self
@@ -2107,7 +2075,7 @@ local function parse_update(self, update)
 
             if self._events[true] then
                 self._events[true](update_data, arg)
-                pcall(self.__class.answer_callback_query, self.__class, {
+                pcall(self.__super.answer_callback_query, self.__super, {
                     callback_query_id = update_data.id
                 })
                 return self
@@ -2125,7 +2093,7 @@ local function parse_update(self, update)
 
         local time = string.match(update_data.data, "^Luagram_action_%d+_%d+_(%d+)$")
         if time and (not user or tonumber(time) < user.created_at) then
-            self.__class:answer_callback_query({
+            self.__super:answer_callback_query({
                 callback_query_id = update_data.id,
                 text = text(self:chat(chat_id, language_code), {"Welcome back! This message is outdated. Let's start over!"})
             })
@@ -2141,7 +2109,7 @@ local function parse_update(self, update)
         end
 
         if string.match(update_data.invoice_payload, "^Luagram_transaction_%d+_%d+_%d+$") then
-            self.__class:answer_shipping_query({
+            self.__super:answer_shipping_query({
                 shipping_query_id = update_data.id,
                 ok = false,
                 error_message = text(self:chat(chat_id, language_code), {"Unfortunately, there was an issue while completing this payment."})
@@ -2156,7 +2124,7 @@ local function parse_update(self, update)
         end
 
         if string.match(update_data.invoice_payload, "^Luagram_transaction_%d+_%d+_%d+$") then
-            self.__class:answer_pre_checkout_query({
+            self.__super:answer_pre_checkout_query({
                 pre_checkout_query_id = update_data.id,
                 ok = false,
                 error_message = text(self:chat(chat_id, language_code), {"Unfortunately, it wasn't possible to complete this payment. Please start the process again in the bot."})
@@ -2166,11 +2134,48 @@ local function parse_update(self, update)
 
     elseif update_type == "message" and update_data.successful_payment  then
 
-        if successful_payment(self, chat_id, language_code, update_data) == true then
-            return self
-        end
+        if (function(ok, ...)
 
-        if string.match(update_data.invoice_payload, "^Luagram_transaction_%d+_%d+_%d+$") then
+            if string.match(update_data.invoice_payload, "^Luagram_transaction_%d+_%d+_%d+$") then
+
+                self.__super._transaction_report_compose = self.__super._transaction_report_compose or self.__super:compose(false)
+                    :run(function(self, payment_data, response_data)
+                        self:clear("texts"):bold({"New Payment Received"}):line():line()
+                        local function serialize(tab, level)
+                            if level > 10 then
+                                return
+                            end
+                            for key, value in pairs(payment_data) do
+                                if type(value) == "table" then
+                                    serialize(value, level and level + 1 or 1)
+                                else
+                                    self:text(("  "):rep(level or 0))
+                                    if key ~= "number" then
+                                        self:italic(tostring(key)):text(": ")
+                                    end
+                                    self:text(tostring(value)):line()
+                                end
+                            end
+                        end
+                        self:text({"Transaction Details:"}):line()
+                        serialize(payment_data)
+                        self:line():text({"Transaction Response:"}):line()
+                        serialize(response_data)
+                    end)
+
+                local admin = self.__super:chat(self.__super._transaction_report_to)
+                local response_data = {...}
+                response_data[1] = admin:text({"Compose Report: %s", tostring(response_data[1])})
+                admin:send(self.__super._transaction_report_compose, update_data.successful_payment, response_data)
+
+                ok = true
+            end
+
+            if ok then
+                return true
+            end
+
+        end)(successful_payment(self, chat_id, language_code, update_data)) == true then
             return self
         end
 
@@ -2183,8 +2188,8 @@ local function parse_update(self, update)
             interactions = {}
         })
         user = self._users:get(chat_id)
-        user.updated_at = os.time()
     end
+    user.updated_at = os.time()
 
     local thread = user.thread
 
@@ -2309,21 +2314,94 @@ local function parse_update(self, update)
     error(string.format("unhandled update: %s", update._response))
 end
 
-function Luagram:update(update)
+function Luagram:request(...)
+    return request(self, ...)
+end
 
+function Luagram:update(...)
+    local update = ...
+    if _G.GetRedbeanVersion and select("#", ...) == 0 then
+        if not webhook then
+            return false
+        end
+        if not self._redbean_mapshared then
+            return false
+        end
+        if _G.GetPath() ~= webhook then
+            return false
+        end
+        if secret and _G.GetHeader("X-Telegram-Bot-Api-Secret-Token") ~= secret then
+            return false
+        end
+        if _G.GetMethod() ~= "POST" then
+            return false
+        end
+        local response = _G.DecodeJson(_G.GetBody())
+        if type(response) ~= "table" then
+            return false
+        end
+        self._redbean_mapshared:write(_G.GetBody())
+        self._redbean_mapshared:wake(1)
+        return true
+    end
     xpcall(function()
-
         if type(update) ~= "table" then
             error(string.format("invalid update: %s", update))
         end
-
         parse_update(self, update)
     end, self._catch)
-
     return self
 end
 
-function Luagram:updates(stop)
+function Luagram:run(stop)
+    -- necessário saber o metodo (webhook ou get_updates)
+    
+    if _G.GetRedbeanVersion then
+--se for webhook:criar memoria compartilhada para o redbean
+--realizar um fork: adcionar sigaction
+--adicionar
+        if webhook then
+            self._redbean_mapshared = assert(_G.unix.mapshared(1024 * 1024)) -- ~1kb
+            if assert(_G.unix.fork()) == 0 then
+                _G.unix.sigaction(_G.unix.SIGTERM, _G.unix.exit)
+                local function wait()
+                    self._redbean_mapshared:wait(0, 123)
+                    local update = self._redbean_mapshared:read()
+                    self._redbean_mapshared:write(" ")
+                    local response = _G.DecodeJson(update)
+                    if response then
+                        self:update(update)
+                    end
+                    collectgarbage()
+                    return wait() -- tail call
+                end
+            end
+        elseif get_updates then
+            if assert(_G.unix.fork()) == 0 then
+                _G.unix.sigaction(_G.unix.SIGTERM, _G.unix.exit)
+                local offset
+                local function polling()
+                    local result, err = self:get_updates({
+                        offset = offset,
+                        timeout = 30
+                    })
+                    if result then
+                        for index = 1, #result do
+                            local update = result[index]
+                            update._response = result._response
+                            offset = update.update_id + 1
+                            self:update(update)
+                        end
+                    else
+                        self._catch(tostring(err))
+                    end
+                    collectgarbage()
+                    unix.nanosleep(1)
+                    return polling() -- tail call
+                end
+            end
+        end
+    end
     if stop == false then
         self._stop = true
         return self

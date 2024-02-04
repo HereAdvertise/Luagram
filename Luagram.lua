@@ -637,6 +637,11 @@ print(":::::aqui",media_type)
     end
 
     if transaction then
+
+        if not chat.__super._transaction_provider_token then
+            error("You cannot use transaction composes because you have not defined the options transactions.provider_token and transactions.currency")
+        end
+
         if media then
             output.photo_url = media
         end

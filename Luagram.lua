@@ -211,14 +211,14 @@ end
 local send_object
 local media_cache = {}
 
-local function parse_compose(chat, compose, ...)
+local function parse_compose(chat, compose, only_content, ...)
     print("entrou no compose parser@@@@@@")
 
     local users = chat.__super._users
 
     local user = users:get(chat._chat_id)
 
-    if not user then
+    if not only_content and not user then
         compose:catch("user not found")
         return
     end
@@ -273,6 +273,10 @@ local function parse_compose(chat, compose, ...)
                 if result == false then
                     return false
                 elseif result then
+                    if only_content then
+                        return false
+                    end
+
                     if type(result) == "table" and result._name then
                         result = result._name
                     end
@@ -428,23 +432,23 @@ local function parse_compose(chat, compose, ...)
                 texts[#texts + 1] = text(chat, item.value)
 
             -- others
-            elseif item._type == "media" then
+            elseif not only_content and item._type == "media" then
                 media = item.media
                 media_spoiler = item.spoiler
-            elseif item._type == "title" then
+            elseif not only_content and item._type == "title" then
                 title[#title + 1] = text(chat, item.title)
-            elseif item._type == "description" then
+            elseif not only_content and item._type == "description" then
                 description[#description + 1] = text(chat, item.description)
-            elseif item._type == "price" then
+            elseif not only_content and item._type == "price" then
                 prices[#prices + 1] = {
                     label = text(chat, item.label),
                     amount = item.amount
                 }
-            elseif item._type == "data" then
+            elseif not only_content and  item._type == "data" then
                 data[item.key] = item.value
 
             -- interactions
-            elseif item._type == "button" then
+            elseif not only_content and item._type == "button" then
                 local event = string.format("Luagram_event_%s", item.event)
                 if tonumber(item.arg) then
                     event = string.format("%s_%s", event, item.arg)
@@ -453,7 +457,7 @@ local function parse_compose(chat, compose, ...)
                     text = text(chat, item.label),
                     callback_data = event
                 }
-            elseif item._type == "action" then
+            elseif not only_content and item._type == "action" then
                 if type(item.action) ~= "function" then
                     local action = item.action
                     item.action = function(_, ...)
@@ -476,12 +480,12 @@ local function parse_compose(chat, compose, ...)
                     text = label,
                     callback_data = uuid
                 }
-            elseif item._type == "location" then
+            elseif not only_content and item._type == "location" then
                 row[#row + 1] = {
                     text = text(chat, item.label),
                     url = item.location
                 }
-            elseif item._type == "transaction" then
+            elseif not only_content and item._type == "transaction" then
                 if transaction then
                     error("transaction previously defined for this compose")
                 end
@@ -514,7 +518,7 @@ local function parse_compose(chat, compose, ...)
 
                 user.interactions[uuid] = interaction
 
-            elseif item._type == "row" then
+            elseif not only_content and item._type == "row" then
                 if #row > 0 then
                     buttons[#buttons + 1] = row
                     row = {}
@@ -524,6 +528,11 @@ local function parse_compose(chat, compose, ...)
         index = index + 1
     end
     close_tags()
+
+    if only_content then
+        return table.concat(texts)
+    end
+
     if #row > 0 then
         buttons[#buttons + 1] = row
     end
@@ -736,7 +745,7 @@ send_object = function(self, chat_id, language_code, name, ...)
             return self
         end
 
-        local result, err = parse_compose(chat, this, ...)
+        local result, err = parse_compose(chat, this, false, ...)
 
         if result then
 
@@ -1187,6 +1196,10 @@ addons.compose = function(self)
         })
         return self
     end
+
+    compose.parse = function(self, ...)
+        return parse_compose(nil, self:clone(), true, unlist(select("#", ...) > 0 and list(...)))
+    end,
 
     compose.dispatch = function(self, dispatch, before)
         if before then
@@ -1779,7 +1792,7 @@ local function callback_query(self, chat_id, language_code, update_data)
             end
         end
 
-        local result, err = parse_compose(chat, this:clone(), unlist(select("#", ...) > 0 and list(...) or action.args))
+        local result, err = parse_compose(chat, this:clone(), false, unlist(select("#", ...) > 0 and list(...) or action.args))
         if not result then
             action.compose._catch(string.format("parser error: %s", err))
             return

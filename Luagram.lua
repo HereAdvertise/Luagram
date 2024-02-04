@@ -1,4 +1,4 @@
--- (c) 2023 Propagram. MIT Licensed.
+-- (c) 2023-2024 Propagram. MIT Licensed.
 
 local unpack = table.unpack or unpack
 

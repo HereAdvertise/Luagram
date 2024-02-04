@@ -173,7 +173,7 @@ local function format(values)
                 return string.format("%%%s[%s]", specifier, name)
             end
             if not values[name] then
-                error("no key '" .. name .. "' for string found")
+                error(string.format("no key %q for string found", name))
             end
             return string.format(specifier, (string.gsub(values[name], "%%", "%%%%")))
         end

@@ -167,7 +167,7 @@ local function locale(self, value, number)
 end
 
 local function format(values)
-    local result = string.gsub(values[1], "(%%?)(%%[%-%+#%.%d]*[cdiouxXeEfgGqsaAp])%[(%w+)%]",
+    local result = string.gsub(values[1], "(%%?)(%%[%-%+#%.%d]*[cdiouxXeEfgGqsaAp])%[(.-)%]",
         function(prefix, specifier, name)
             if prefix == "%" then
                 return string.format("%%%s[%s]", specifier, name)
@@ -877,6 +877,14 @@ addons.compose = function(self)
             end
         end
         return value
+    end, function(self, value, ...)
+        if type(value) == "function" then
+            return self:run(value, ...)
+        elseif type(value) == "string" then
+            return self:text(value)
+        else
+            error(string.format("compose: invalid call %q", tostring(value)))
+        end
     end)
 
     local compose = self.compose
@@ -1237,6 +1245,12 @@ addons.session = function(self)
         self._args = list(...)
         self:catch(catch_error)
         self.__super._objects[name] = self
+    end, nil, function(self, value)
+        if type(value) == "function" then
+            return self:main(value)
+        else
+            error(string.format("session: invalid call %q", tostring(value)))
+        end
     end)
 
     local session = self.session
@@ -1261,6 +1275,7 @@ addons.chat = function(self)
     self:object("chat", function(self, chat_id, language_code)
         self._type = "chat"
         self._chat_id = chat_id
+        self._parse_mode = "HTML"
         self._language_code = language_code
     end, function(self, key)
         local value = rawget(getmetatable(self), key)
@@ -1275,6 +1290,8 @@ addons.chat = function(self)
             end
         end
         return value
+    end, function(self, ...)
+        return self:say(...)
     end)
 
     local chat = self.chat
@@ -1291,7 +1308,7 @@ addons.chat = function(self)
         end
         self.__super:send_message({
             chat_id = self._chat_id,
-            parser_mode = "HTML",
+            parse_mode = self._parse_mode,
             text = table.concat(texts, "\n")
         })
         return self
@@ -1529,9 +1546,10 @@ function Luagram.new(options)
     return self
 end
 
-function Luagram:object(name, new, index)
+function Luagram:object(name, new, index, call)
     local class = {}
     class.__index = index or class
+    class.__call = call
     self[name] = setmetatable({}, {
         __call = function(_, base, ...)
             local self = setmetatable({}, class)

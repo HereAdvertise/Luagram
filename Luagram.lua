@@ -2259,6 +2259,22 @@ local function parse_update(self, update)
     end
     user.updated_at = os.time()
 
+    if update_type == "message" then
+        local text = update_data.text
+        local command, space, payload = string.match(text, "^(/[a-zA-Z0-9_]+)(.?)(.*)$")
+        if command and self.__super._objects[command] then
+            if space == " " and payload ~= "" then
+                if send_object(self, chat_id, language_code, command, payload) == true then
+                    return self
+                end
+            else
+                if send_object(self, chat_id, language_code, command) == true then
+                    return self
+                end
+            end
+        end
+    end
+
     local thread = user.thread
 
     if thread then
@@ -2338,24 +2354,6 @@ local function parse_update(self, update)
     end
 
     if update_type == "message" then
-
-        local text = update_data.text
-
-        local command, space, payload = string.match(text, "^(/[a-zA-Z0-9_]+)(.?)(.*)$")
-
-        if command then
-            
-            if space == " " and payload ~= "" then
-                if send_object(self, chat_id, language_code, command, payload) == true then
-                    return self
-                end
-            else
-                if send_object(self, chat_id, language_code, command) == true then
-                    return self
-                end
-            end
-
-        end
 
         if send_object(self, chat_id, language_code, "/start") == true then
             return self

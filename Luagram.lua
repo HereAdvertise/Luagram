@@ -977,7 +977,6 @@ addons.compose = function(self)
         compose[_type] = simple(_type, "value")
     end
 
-    compose.run = simple("run", "run")
     compose.run = function(self, ...)
         local index, run = ...
         local _index, args
@@ -1047,7 +1046,7 @@ addons.compose = function(self)
         return self
     end
 
-    compose.emoji = multiple("emoji", "emoji", "placeholder")
+    compose.emoji = multiple("emoji", "placeholder", "emoji")
 
     compose.code = function(self, ...)
         local index, language, code = ...

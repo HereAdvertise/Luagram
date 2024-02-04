@@ -536,7 +536,7 @@ local function parse_compose(chat, compose, only_content, ...)
     end
 
     if transaction and transaction_label and #buttons > 0 then
-        error("add a label to transaction function to define actions in this compose")
+        error("Add a label to the transaction function to define actions in this compose")
     end
 
     if media then

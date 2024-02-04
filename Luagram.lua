@@ -121,7 +121,7 @@ local function telegram(self, method, data, multipart)
     local ok, result, err = pcall(self.__super._json_decoder, response)
     if ok and type(result) == "table" then
         if not result.ok then
-            return false, string.format("%s: %s", result.error_code, result.description), response, response_status, response_headers
+            return false, string.format("%s: %s", result.error_code or "?", result.description or ""), response, response_status, response_headers
         end
         result = result.result
         if type(result) == "table" then

@@ -1535,6 +1535,9 @@ function Luagram.new(options)
         elseif type(options.get_updates) == "number" then
             self._get_updates.timeout = options.get_updates
         end
+        if not self._get_updates.timeout then
+            self._get_updates.timeout = 30
+        end
     end
 
     self:addon("compose")

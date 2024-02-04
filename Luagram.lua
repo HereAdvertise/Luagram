@@ -329,7 +329,7 @@ local function parse_compose(chat, compose, ...)
                         return
                     end
                     return ..., list(select(2, ...))
-                end)(pcall(item.run, compose, unlist(select("#", ...) > 0 and list(...) or compose._args)))
+                end)(pcall(item.run, compose, unlist(item.args["#"] > 0 and item.args or select("#", ...) > 0 and list(...) or compose._args)))
                 compose._runtime = nil
                 
                 if result == false then
@@ -1019,6 +1019,29 @@ addons.compose = function(self)
     end
 
     compose.run = simple("run", "run")
+    compose.run = function(self, ...)
+        local index, run = ...
+        local _index, args
+        if type(index) == "number" and select("#", ...) > 1 then
+            _index = index
+            args = list(select(3, ...))
+        else
+            run = index
+            args = list(select(2, ...))
+        end
+        if type(run) ~= "function" then
+            local value = run
+            run = function(...)
+                return value, ...
+            end
+        end
+        insert(self, _index, {
+            _type = "run",
+            run = run,
+            args = args,
+        })
+        return self
+    end
 
     compose.link = function(self, ...)
         local index, label, url = ...

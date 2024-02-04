@@ -657,7 +657,7 @@ print(":::::aqui",media_type)
         output.prices = prices
     else
         
-        data.parse_mode = "HTML"
+        data.parse_mode = compose._parse_mode
 print("::::::::::::@@1")
         if method == "animation" then
 print("::::::::::::@@2")
@@ -867,6 +867,7 @@ addons.compose = function(self)
         self._dispatch = {}
         self._predispatch = {}
         self._args = list(...)
+        self._parse_mode = "HTML"
         self:catch(catch_error)
     end, function(self, key)
         local value = rawget(getmetatable(self), key)

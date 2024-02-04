@@ -450,8 +450,8 @@ local function parse_compose(chat, compose, only_content, ...)
             -- interactions
             elseif not only_content and item._type == "button" then
                 local event = string.format("Luagram_event_%s", item.event)
-                if tonumber(item.arg) then
-                    event = string.format("%s_%s", event, item.arg)
+                if item.arg ~= nil then
+                    event = string.format("%s_%s", event, tostring(item.arg))
                 end
                 row[#row + 1] = {
                     text = text(chat, item.label),
@@ -1096,11 +1096,8 @@ addons.compose = function(self)
         if #event > 15 or string.match(event, "%W") then
             error(string.format("invalid event name: %s", event))
         end
-        if arg then
-            arg = tonumber(arg)
-            if not arg then
-                error(string.format("invalid argument: %s", arg))
-            end
+        if arg and #tostring(arg) > 20 then
+            error(string.format("invalid argument: very large value"))
         end
         insert(self, _index, {
             _type = "button",
@@ -2141,14 +2138,12 @@ local function parse_update(self, update)
             return self
         end
 
-        local event, arg = string.match(update_data.data, "^Luagram_event_(%w+)_?(%d*)$")
+        local event, has_arg, arg = string.match(update_data.data, "^Luagram_event_(%w+)(_?)(.*)$")
 
         if event then
 
-            if arg == "" then
+            if has_arg ~= "_" then
                 arg = nil
-            else
-                arg = tonumber(arg)
             end
 
             if self._events[event] and self._events[event](update_data, arg) ~= false then

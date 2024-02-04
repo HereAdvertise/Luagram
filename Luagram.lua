@@ -209,7 +209,6 @@ local function catch_error(err)
 end
 
 local send_object
-local media_cache = {}
 
 local function parse_compose(chat, compose, only_content, ...)
     print("entrou no compose parser@@@@@@")
@@ -563,8 +562,8 @@ print(":::::aqui",media_type)
     end
 
     if media and media_type == "id" then
-        if media_cache[media] then
-            method = media_cache[media] 
+        if self.__super._media_cache[media] then
+            method = self.__super._media_cache[media] 
         else
             local response, err = chat.__super:get_file({
                 file_id = media
@@ -583,13 +582,13 @@ print(":::::aqui",media_type)
             else
                 error(string.format("unknown file type: %s", file_path))
             end
-            media_cache[media]  = method
+            self.__super._media_cache[media]  = method
         end
 
     elseif media and media_type == "url" then
 
-        if media_cache[media] then
-            method = media_cache[media] 
+        if self.__super._media_cache[media] then
+            method = self.__super._media_cache[media] 
         else
             local response, status, headers = request(compose, media)
 
@@ -616,11 +615,11 @@ print(":::::aqui",media_type)
             else
                 error(string.format("content type not found for media %s", media))
             end
-            media_cache[media]  = method
+            self.__super._media_cache[media]  = method
         end
     elseif media and media_type == "path" then
-        if media_cache[media] then
-            method = media_cache[media] 
+        if self.__super._media_cache[media] then
+            method = self.__super._media_cache[media] 
         else
             local extension = string.lower(assert(string.match(media, "([^%.]+)$"), "no extension"))
 
@@ -631,7 +630,7 @@ print(":::::aqui",media_type)
             else
                 error(string.format("unknown media type: %s", media))
             end
-            media_cache[media]  = method
+            self.__super._media_cache[media]  = method
         end
     elseif media then
         error(string.format("unknown media type: %s", tostring(media)))
@@ -1397,6 +1396,7 @@ function Luagram.new(options)
     self._ids = 0
     self._objects = {}
     self._events = {}
+    self._media_cache = {}
     self._users = lru.new(options.cache or 1024)
     self._catch = catch_error
     self.__super = self

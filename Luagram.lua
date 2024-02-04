@@ -1500,10 +1500,6 @@ function Luagram.new(options)
             error("invalid webhook")
         end
         assert(type(self._webhook.url) ~= "string", "required option: webhook.url")
-        if self._webhook.set_webhook ~= false then
-            self:set_webhook(self._webhook)
-        end
-        self._webhook.set_webhook = nil
     end
     if not options.webhook then
         self._get_updates = {}
@@ -2384,15 +2380,17 @@ function Luagram:request(...)
     return request(self, ...)
 end
 
-function Luagram:json_encode(...)
-    return self.__super._json_encoder(...)
-end
-
-function Luagram:json_decode(...)
-    return self.__super._json_decoder(...)
+function Luagram:json(value)
+    if type(value) == "string" then
+        return self.__super._json_decoder(value)
+    end
+    return self.__super._json_encoder(value)
 end
 
 function Luagram:update(...)
+    if self._stop ~= false then
+        return self
+    end
     local update = ...
     if _G.GetRedbeanVersion and select("#", ...) == 0 then
         if not self._webhook then
@@ -2432,7 +2430,12 @@ end
 function Luagram:start()
     if _G.GetRedbeanVersion then
         if self._webhook then
+            if self._webhook.set_webhook ~= false then
+                self._webhook.set_webhook = nil
+                self.__super:set_webhook(self._webhook)
+            end
             self._redbean_mapshared = assert(_G.unix.mapshared(1024 * 1024)) -- ~1kb
+            self._stop = false
             if assert(_G.unix.fork()) == 0 then
                 _G.unix.sigaction(_G.unix.SIGTERM, _G.unix.exit)
                 local function wait()
@@ -2450,6 +2453,7 @@ function Luagram:start()
         elseif self._get_updates then
             if assert(_G.unix.fork()) == 0 then
                 _G.unix.sigaction(_G.unix.SIGTERM, _G.unix.exit)
+                self._stop = false
                 local offset
                 local function polling()
                     if self._stop then
@@ -2457,10 +2461,8 @@ function Luagram:start()
                         _G.unix.exit()
                         return
                     end
-                    local result, err = self:get_updates({
-                        offset = offset,
-                        timeout = self._get_updates_timeout or 30
-                    })
+                    self._get_updates.offset = offset
+                    local result, err = self.__super:get_updates(self._get_updates)
                     if result then
                         for index = 1, #result do
                             local update = result[index]
@@ -2479,17 +2481,22 @@ function Luagram:start()
         end
         return self
     else
-        if self._get_updates then
+        if self._webhook then
+            if self._webhook.set_webhook ~= false then
+                self._webhook.set_webhook = nil
+                self.__super:set_webhook(self._webhook)
+            end
+            self._stop = false
+        elseif self._get_updates then
             local offset
+            self._stop = false
             local function polling()
                 if self._stop then
                     self._stop = nil
                     return
                 end
-                local result, err = self:get_updates({
-                    offset = offset,
-                    timeout = self._get_updates_timeout or 30
-                })
+                self._get_updates.offset = offset
+                local result, err = self.__super:get_updates(self._get_updates)
                 if result then
                     for index = 1, #result do
                         local update = result[index]

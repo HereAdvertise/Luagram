@@ -1653,6 +1653,14 @@ local function callback_query(self, chat_id, language_code, update_data)
         return self
     end
 
+    this.id = function()
+        return chat:id()
+    end
+
+    this.language = function()
+        return chat:language()
+    end
+
     this.source = function(self)
         return self._update_data, self._update_type
     end

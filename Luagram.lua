@@ -15,72 +15,16 @@ local function id(self)
     return self.__super._ids
 end
 
-local http_provider, json_encoder, json_decoder
-
-local function detect_env()
-    if http_provider then
-        return
-    end
-    local ok
-    ok = pcall(_G.GetRedbeanVersion)
-    if ok then
-        http_provider = function(...)
-            local status, headers, body = _G.Fetch(...)
-            return body, status, headers
-        end
-        json_encoder = _G.EncodeJson
-        json_decoder = _G.DecodeJson
-        return
-    end
-    local ngx_http
-    ok, ngx_http = pcall(require, "lapis.nginx.http")
-    if _G.ngx and ok then
-        http_provider = function(url, options)
-            return ngx_http.simple(url, options)
-        end
-        local json = require("cjson")
-        json_encoder = json.encode
-        json_decoder = json.decode
-        return
-    end
-    local http = require("ssl.https")
-    local ltn12 = require("ltn12")
-    http_provider = function(url, options)
-        local out = {}
-        if not options then
-            options = {}
-        end
-        if options.body then
-            options.source = ltn12.source.string(options.body)
-        end
-        options.sink = ltn12.sink.table(out)
-        options.url = url
-        local _, status, headers = http.request(options)
-        local response = table.concat(out)
-        return response, status, headers
-    end
-    local json
-    ok, json = pcall(require, "cjson")
-    if not ok then
-        json = require("json")
-    end
-    json_encoder = json.encode
-    json_decoder = json.decode
-end
-
 local function stdout(message)
-    print(message)
-    io.stdout:write("Luagram: ", os.date("!%Y-%m-%d %H:%M:%S GMT: "), tostring(message), "\n")
+    io.stdout:write("(Luagram) ", os.date("!%Y-%m-%d %H:%M:%S GMT: "), tostring(message), "\n")
 end
 
 local function stderr(message)
-    print("[Error] ", message)
-    io.stderr:write("Luagram: ", os.date("!%Y-%m-%d %H:%M:%S GMT: "), "[Error] ", tostring(message), "\n")
+    io.stderr:write("(Luagram) ", os.date("!%Y-%m-%d %H:%M:%S GMT: "), "[Error] ", tostring(message), "\n")
 end
 
 local function request(self, url, options)
-    local _http_provider = self.__super._http_provider or http_provider
-    local response, response_status, headers = _http_provider(url, options)
+    local response, response_status, headers = self.__super._http_provider(url, options)
     local response_headers
     if response_status == 200 and type(headers) == "table" then
         response_headers = {}
@@ -111,8 +55,6 @@ local mimetypes = {
 }
 
 local function telegram(self, method, data, multipart)
-    local _json_encoder = self.__super._json_encoder or json_encoder
-    local _json_decoder = self.__super._json_decoder or json_decoder
     local api = self.__super._api or "https://api.telegram.org/bot%s/%s"
     api = string.format(api, self.__super._token, string.gsub(method, "%W", ""))
     local headers, body
@@ -140,7 +82,7 @@ local function telegram(self, method, data, multipart)
             else
                 body[#body + 1] = "\r\n\r\n"
                 if type(value) == "table" then
-                    body[#body + 1] = _json_encoder(value)
+                    body[#body + 1] = self.__super._json_encoder(value)
                 else
                     body[#body + 1] = tostring(value)
                 end
@@ -154,7 +96,7 @@ local function telegram(self, method, data, multipart)
             ["content-length"] = #body
         }
     else
-        body = _json_encoder(data)
+        body = self.__super._json_encoder(data)
         headers = {
             ["content-type"] = "application/json",
             ["content-length"] = #body
@@ -176,7 +118,7 @@ local function telegram(self, method, data, multipart)
         headers = headers
     })
     stderr("<--".. tostring(response)..tostring(response_status))
-    local ok, result, err = pcall(_json_decoder, response)
+    local ok, result, err = pcall(self.__super._json_decoder, response)
     if ok and type(result) == "table" then
         if not result.ok then
             return false, string.format("%s: %s", result.error_code, result.description), response, response_status, response_headers
@@ -262,12 +204,8 @@ local function text(self, value)
     return value
 end
 
-local function catch_error(...)
-    local message = {}
-    for index = 1, select("#", ...) do
-        message[#message + 1] = tostring(select(index, ...))
-    end
-    stderr(debug.traceback(table.concat(message, "\n\n")))
+local function catch_error(err)
+    stderr(debug.traceback(tostring(err)))
 end
 
 local send_object
@@ -1268,8 +1206,8 @@ addons.compose = function(self)
     end
 
     compose.catch = function(self, catch)
-        self._catch = function(...)
-            catch(self._name, ...)
+        self._catch = function(err)
+            catch(string.format("%s: %s", self._name, err))
         end
         return self
     end
@@ -1300,8 +1238,8 @@ addons.session = function(self)
     end
 
     session.catch = function(self, catch)
-        self._catch = function(...)
-            catch(self._name, ...)
+        self._catch = function(err)
+            catch(string.format("%s: %s", self._name, err))
         end
         return self
     end
@@ -1445,14 +1383,12 @@ function Luagram.new(options)
     assert(type(options) == "table", "invalid param: options")
     assert(type(options.token) == "string", "invalid token")
 
+    self._options = options
     self._ids = 0
     self._objects = {}
     self._events = {}
     self._users = lru.new(options.cache or 1024)
     self._catch = catch_error
-    self._http_provider = options.http_provider
-    self._json_encoder = options.json_encoder
-    self._json_decoder = options.json_decoder
     self.__super = self
 
     self._token = options.token
@@ -1465,15 +1401,124 @@ function Luagram.new(options)
         self._transaction_provider_token = assert(options.transactions.provider_token, "required option: transactions.provider_token")
     end
 
+    self._http_provider = options.http_provider
+    self._json_encoder = options.json_encoder
+    self._json_decoder = options.json_decoder
+
+    if not options.http_provider then
+        if _G.GetRedbeanVersion then
+            self._http_provider = function(url, params)
+                local status, headers, body = _G.Fetch(url, params)
+                return body, status, headers
+            end
+        elseif _G.ngx then
+            local http = require("lapis.nginx.http")
+            self._http_provider = function(url, params)
+                return http.simple(url, params)
+            end
+        else
+            local http = require("ssl.https")
+            local ltn12 = require("ltn12")
+            self._http_provider = function(url, params)
+                local out = {}
+                if not params then
+                    params = {}
+                end
+                if params.body then
+                    params.source = ltn12.source.string(params.body)
+                end
+                params.sink = ltn12.sink.table(out)
+                params.url = url
+                local _, status, headers = http.request(params)
+                local response = table.concat(out)
+                return response, status, headers
+            end
+        end
+    else
+        local http = require("ssl.https")
+        local ltn12 = require("ltn12")
+        if type(options.http_provider) == "table" and type(options.http_provider.request) == "function" then
+            options.http_provider = options.http_provider.request
+        end
+        self._http_provider = function(url, params)
+            local out = {}
+            if not params then
+                params = {}
+            end
+            if params.body then
+                params.source = ltn12.source.string(params.body)
+            end
+            params.sink = ltn12.sink.table(out)
+            params.url = url
+            local _, status, headers = options.http_provider(params)
+            local response = table.concat(out)
+            return response, status, headers
+        end
+    end
+
+    if not self._json_encoder then
+        if _G.GetRedbeanVersion then
+            self._json_encoder = _G.EncodeJson
+        elseif _G.ngx then
+            local json = require("cjson")
+            self._json_encoder = json.encode
+        else
+            local ok, cjson = pcall(require, "cjson")
+            if ok then
+                self._json_encoder = cjson.encode
+            else
+                local json = require("json")
+                self._json_encoder = json.encode
+            end
+        end
+    end
+
+    if not self._json_decoder then
+        if _G.GetRedbeanVersion then
+            self._json_decoder = _G.DecodeJson
+        elseif _G.ngx then
+            local json = require("cjson")
+            self._json_decoder = json.decode
+        else
+            local ok, cjson = pcall(require, "cjson")
+            if ok then
+                self._json_decoder = cjson.decode
+            else
+                local json = require("json")
+                self._json_decoder = json.decode
+            end
+        end
+    end
+
+    if options.webhook then
+        self._webhook = {}
+        if type(options.webhook) == "table" then
+            self._webhook = options.webhook
+        elseif type(options.webhook) == "string" then
+            self._webhook.url = options.webhook
+        else
+            error("invalid webhook")
+        end
+        assert(type(self._webhook.url) ~= "string", "required option: webhook.url")
+        if self._webhook.set_webhook ~= false then
+            self:set_webhook(self._webhook)
+        end
+        self._webhook.set_webhook = nil
+    end
+    if not options.webhook then
+        self._get_updates = {}
+        if type(options.get_updates) == "table" then
+            self._get_updates = options.get_updates
+        elseif type(options.get_updates) == "number" then
+            self._get_updates.timeout = options.get_updates
+        end
+    end
+
     self:addon("compose")
     self:addon("session")
     self:addon("chat")
 
     self:on_unhandled(stdout)
-
-    if not self._http_provider and not http_provider then
-        detect_env()
-    end
 
     return self
 end
@@ -2341,31 +2386,41 @@ function Luagram:request(...)
     return request(self, ...)
 end
 
+function Luagram:json_encode(...)
+    return self.__super._json_encoder(...)
+end
+
+function Luagram:json_decode(...)
+    return self.__super._json_decoder(...)
+end
+
 function Luagram:update(...)
     local update = ...
     if _G.GetRedbeanVersion and select("#", ...) == 0 then
-        if not webhook then
+        if not self._webhook then
             return false
         end
         if not self._redbean_mapshared then
             return false
         end
-        if _G.GetPath() ~= webhook then
+        local path = string.match(self._webhook.url, "^[hH][tT][tT][pP][sS]?://.-/(.*)$")
+        if not path or _G.GetPath() ~= string.format("/%s", path) then
             return false
         end
-        if secret and _G.GetHeader("X-Telegram-Bot-Api-Secret-Token") ~= secret then
+        if self._webhook.secret_token and _G.GetHeader("X-Telegram-Bot-Api-Secret-Token") ~= self._webhook.secret_token then
             return false
         end
         if _G.GetMethod() ~= "POST" then
             return false
         end
-        local response = _G.DecodeJson(_G.GetBody())
+        local body = _G.GetBody()
+        local response = _G.DecodeJson(body)
         if type(response) ~= "table" then
             return false
         end
-        self._redbean_mapshared:write(_G.GetBody())
+        self._redbean_mapshared:write(body)
         self._redbean_mapshared:wake(1)
-        return true
+        return self
     end
     xpcall(function()
         if type(update) ~= "table" then
@@ -2376,14 +2431,9 @@ function Luagram:update(...)
     return self
 end
 
-function Luagram:run(stop)
-    -- necessário saber o metodo (webhook ou get_updates)
-    
+function Luagram:start()
     if _G.GetRedbeanVersion then
---se for webhook:criar memoria compartilhada para o redbean
---realizar um fork: adcionar sigaction
---adicionar
-        if webhook then
+        if self._webhook then
             self._redbean_mapshared = assert(_G.unix.mapshared(1024 * 1024)) -- ~1kb
             if assert(_G.unix.fork()) == 0 then
                 _G.unix.sigaction(_G.unix.SIGTERM, _G.unix.exit)
@@ -2399,14 +2449,19 @@ function Luagram:run(stop)
                     return wait() -- tail call
                 end
             end
-        elseif get_updates then
+        elseif self._get_updates then
             if assert(_G.unix.fork()) == 0 then
                 _G.unix.sigaction(_G.unix.SIGTERM, _G.unix.exit)
                 local offset
                 local function polling()
+                    if self._stop then
+                        self._stop = nil
+                        _G.unix.exit()
+                        return
+                    end
                     local result, err = self:get_updates({
                         offset = offset,
-                        timeout = 30
+                        timeout = self._get_updates_timeout or 30
                     })
                     if result then
                         for index = 1, #result do
@@ -2424,31 +2479,39 @@ function Luagram:run(stop)
                 end
             end
         end
-    end
-    if stop == false then
-        self._stop = true
         return self
-    end
-    local offset
-    while true do
-        if self._stop then
-            self._stop = nil
-            break
-        end
-        local result, err = self:get_updates({
-            offset = offset
-        })
-        if result then
-            for index = 1, #result do
-                local update = result[index]
-                update._response = result._response
-                offset = update.update_id + 1
-                self:update(update)
+    else
+        if self._get_updates then
+            local offset
+            local function polling()
+                if self._stop then
+                    self._stop = nil
+                    return
+                end
+                local result, err = self:get_updates({
+                    offset = offset,
+                    timeout = self._get_updates_timeout or 30
+                })
+                if result then
+                    for index = 1, #result do
+                        local update = result[index]
+                        update._response = result._response
+                        offset = update.update_id + 1
+                        self:update(update)
+                    end
+                else
+                    self._catch(err)
+                end
+                collectgarbage()
+                return polling() -- tail call
             end
-        else
-            self._catch(err)
+            return self
         end
     end
+end
+
+function Luagram:stop()
+    self._stop = true
     return self
 end
 

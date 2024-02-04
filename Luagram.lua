@@ -211,7 +211,6 @@ end
 local send_object
 
 local function parse_compose(chat, compose, only_content, ...)
-    print("entrou no compose parser@@@@@@")
 
     local users = chat.__super._users
 
@@ -250,7 +249,7 @@ local function parse_compose(chat, compose, only_content, ...)
     end
 
     local index = 1
-    print("entrou no loop")
+
     while index <= #compose do
         local item = compose[index]
         if type(item) == "table" and item._type and item._indexed ~= compose._id then
@@ -546,12 +545,10 @@ local function parse_compose(chat, compose, only_content, ...)
         elseif string.match(media, "%.") then
             media_type = "path"
             multipart = true
-            print(":::::aqui")
         else
             media_type = "id"
         end
     end
-print(":::::aqui",media_type)
     if transaction and media and media_type == "url" then
         if not data.photo_url then
             data.photo_url = media
@@ -658,9 +655,9 @@ print(":::::aqui",media_type)
     else
         
         data.parse_mode = compose._parse_mode
-print("::::::::::::@@1")
+
         if method == "animation" then
-print("::::::::::::@@2")
+
             if media then
                 output.animation = media
                 output.has_spoiler = media_spoiler
@@ -670,7 +667,7 @@ print("::::::::::::@@2")
             end
             output.caption = table.concat(texts)
         elseif method == "photo" then
-print("::::::::::::@@3 media", media)
+
             if media then
                 output.photo = media
                 output.has_spoiler = media_spoiler
@@ -679,9 +676,7 @@ print("::::::::::::@@3 media", media)
                 end
             end
             output.caption = table.concat(texts)
-            print("::::::::::::@@3",output.caption)
         else
-print("::::::::::::@@4")
             output.text = table.concat(texts)
         end
 
@@ -696,7 +691,6 @@ print("::::::::::::@@4")
     end
 
     for key, value in pairs(data) do
-        print("adicionou", key, value)
         output[key] = value
     end
 
@@ -922,7 +916,6 @@ addons.compose = function(self)
         if not index then
             if self._runtime then
                 data._runtime = true
-                for k,v in pairs(data) do print(k,v) end
                 table.insert(self, self._runtime, data)
                 self._runtime = self._runtime + 1
             else
@@ -1401,8 +1394,6 @@ local Luagram = {}
 
 function Luagram.new(options)
 
-    Log(kLogWarn,"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@new restarded")
-    
     local self = setmetatable({}, Luagram)
 
     if type(options) == "string" then
@@ -1690,8 +1681,6 @@ local function callback_query(self, chat_id, language_code, update_data)
 
     this.this = function(self, label, action, ...)
         for index = 1, #self do
-            print(action.id)
-            print(self[index].id)
             if type(self[index]) == "table" and self[index]._type == "action" and self[index].id == action.id then
                 self[index].index = index
                 if label ~= nil then
@@ -1728,15 +1717,7 @@ local function callback_query(self, chat_id, language_code, update_data)
                 end
             end
         end
-                print("#################################")
-        for k,v in pairs(self) do
-            print(k,v)
-            if type(v) =="table" then
-                for k2,v2 in pairs(v) do
-                    print(" "," ",k2, v2)
-                end
-            end
-        end
+
         return self
     end
 
@@ -2288,7 +2269,6 @@ local function parse_update(self, update)
     end
 
     if not user then
-        print("$$$$$$$$$$$$$$$$$ criando user")
         self._users:set(chat_id, {
             created_at = os.time(),
             interactions = {}
@@ -2316,9 +2296,7 @@ local function parse_update(self, update)
     local thread = user.thread
 
     if thread then
-        
-        print("!!!!!!!!!!!!!!!!é thread", coroutine.status(thread.main))
-        
+
         if coroutine.status(thread.main) ~= "suspended" then
             user.thread = nil
         else

@@ -559,8 +559,8 @@ local function parse_compose(chat, compose, only_content, ...)
     end
 
     if media and media_type == "id" then
-        if self.__super._media_cache[media] then
-            method = self.__super._media_cache[media] 
+        if chat.__super._media_cache[media] then
+            method = chat.__super._media_cache[media] 
         else
             local response, err = chat.__super:get_file({
                 file_id = media
@@ -579,13 +579,13 @@ local function parse_compose(chat, compose, only_content, ...)
             else
                 error(string.format("unknown file type: %s", file_path))
             end
-            self.__super._media_cache[media]  = method
+            chat.__super._media_cache[media]  = method
         end
 
     elseif media and media_type == "url" then
 
-        if self.__super._media_cache[media] then
-            method = self.__super._media_cache[media] 
+        if chat.__super._media_cache[media] then
+            method = chat.__super._media_cache[media] 
         else
             local response, status, headers = request(compose, media)
 
@@ -612,11 +612,11 @@ local function parse_compose(chat, compose, only_content, ...)
             else
                 error(string.format("content type not found for media %s", media))
             end
-            self.__super._media_cache[media]  = method
+            chat.__super._media_cache[media]  = method
         end
     elseif media and media_type == "path" then
-        if self.__super._media_cache[media] then
-            method = self.__super._media_cache[media] 
+        if chat.__super._media_cache[media] then
+            method = chat.__super._media_cache[media] 
         else
             local extension = string.lower(assert(string.match(media, "([^%.]+)$"), "no extension"))
 
@@ -627,7 +627,7 @@ local function parse_compose(chat, compose, only_content, ...)
             else
                 error(string.format("unknown media type: %s", media))
             end
-            self.__super._media_cache[media]  = method
+            chat.__super._media_cache[media]  = method
         end
     elseif media then
         error(string.format("unknown media type: %s", tostring(media)))
@@ -1201,7 +1201,7 @@ addons.compose = function(self)
 
     compose.parse = function(self, ...)
         return parse_compose(nil, self:clone(), true, unlist(select("#", ...) > 0 and list(...)))
-    end,
+    end
 
     compose.dispatch = function(self, dispatch, before)
         if before then
@@ -1324,8 +1324,6 @@ addons.chat = function(self)
         return self._language_code
     end
 
-end
-
     return self
 end
 
@@ -1440,7 +1438,7 @@ function Luagram.new(options)
                 return http.simple(url, params)
             end
         else
-            local http = require("ssl.https")
+            local https = require("ssl.https")
             local ltn12 = require("ltn12")
             self._http_provider = function(url, params)
                 local out = {}
@@ -1452,13 +1450,12 @@ function Luagram.new(options)
                 end
                 params.sink = ltn12.sink.table(out)
                 params.url = url
-                local _, status, headers = http.request(params)
+                local _, status, headers = https.request(params)
                 local response = table.concat(out)
                 return response, status, headers
             end
         end
     else
-        local http = require("ssl.https")
         local ltn12 = require("ltn12")
         if type(options.http_provider) == "table" and type(options.http_provider.request) == "function" then
             options.http_provider = options.http_provider.request
@@ -2227,7 +2224,7 @@ local function parse_update(self, update)
                 self.__super._transaction_report_compose = self.__super._transaction_report_compose or self.__super:compose(false)
                     :run(function(self, payment_data, response_data)
                         self:clear("texts"):bold({"New Payment Received"}):line():line()
-                        local function serialize(tab, level)
+                        local function serialize(payment_data, level)
                             if level > 10 then
                                 return
                             end
@@ -2493,7 +2490,7 @@ function Luagram:start()
                         self._catch(tostring(err))
                     end
                     collectgarbage()
-                    unix.nanosleep(1)
+                    _G.unix.nanosleep(1)
                     return polling() -- tail call
                 end
             end

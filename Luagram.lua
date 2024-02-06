@@ -290,7 +290,7 @@ local function parse_compose(chat, compose, only_content, ...)
                     return false
                 end
 
-            -- texts
+            -- content
             elseif item._type == "text" then
                 texts[#texts + 1] = escape(text(chat, item.value))
             elseif item._type == "bold" then
@@ -435,10 +435,7 @@ local function parse_compose(chat, compose, only_content, ...)
                 close_tags()
                 texts[#texts + 1] = text(chat, item.value)
 
-            -- others
-            elseif not only_content and item._type == "media" then
-                media = item.media
-                media_spoiler = item.spoiler
+            -- content (extra)
             elseif not only_content and item._type == "title" then
                 title[#title + 1] = text(chat, item.title)
             elseif not only_content and item._type == "description" then
@@ -448,10 +445,15 @@ local function parse_compose(chat, compose, only_content, ...)
                     label = text(chat, item.label),
                     amount = item.amount
                 }
+
+            -- misc
+            elseif not only_content and item._type == "media" then
+                media = item.media
+                media_spoiler = item.spoiler
             elseif not only_content and  item._type == "data" then
                 data[item.key] = item.value
 
-            -- interactions
+            -- keyboard
             elseif not only_content and item._type == "button" then
                 local event = string.format("Luagram_event_%s", item.event)
                 if item.arg ~= nil then
@@ -1702,29 +1704,36 @@ local function callback_query(self, chat_id, language_code, update_data)
     end
 
     this.clear = function(self, _type) -- luacheck: ignore
-        local buttons = {
-            button = true, action = true, location = true, transaction = true, row = true
-        }
-        local texts = {
-            text = true, bold = true, italic = true, underline = true, spoiler = true, strike = true, link = true, mention = true, mono = true, pre = true, line = true, html = true, quote = true, close = true, title = true, description = true, price = true
-        }
         local runtime = {
             run = true
         }
+        local content = {
+            text = true, bold = true, italic = true, underline = true, spoiler = true, strike = true, link = true, mention = true, mono = true, pre = true, line = true, html = true, quote = true, close = true, title = true, description = true, price = true
+        }        
+        local misc = {
+            media = true, data = true
+        }
+        local keyboard = {
+            button = true, action = true, location = true, transaction = true, row = true
+        }
         for index = 1, #self do
             local item = self[index]
-            if _type == "buttons" and type(item) == "table" then
-                if buttons[item._type] then
-                    self[index] = true
-                end
-            elseif _type == "texts" and type(item) == "table" then
-                if texts[item._type] then
-                    self[index] = true
-                end
-            elseif _type == "runtime" and type(item) == "table" then
+            if _type == "runtime" and type(item) == "table" then
                 if runtime[item._type] then
                     self[index] = true
                 end
+            elseif _type == "content" and type(item) == "table" then
+                if content[item._type] then
+                    self[index] = true
+                end
+            elseif _type == "misc" and type(item) == "table" then
+                if misc[item._type] then
+                    self[index] = true
+                end
+            elseif _type == "keyboard" and type(item) == "table" then
+                if keyboard[item._type] then
+                    self[index] = true
+                end            
             end
         end
 

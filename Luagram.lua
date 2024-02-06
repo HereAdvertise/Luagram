@@ -1732,60 +1732,64 @@ local function callback_query(self, chat_id, language_code, update_data)
         return nil
     end
 
-    this.remove = function(self, ...)
+    this.filter = function(self, ...)
+        local results = {}
+        local items = {}
         for index = 1, #self do
             local item = self[index]
-            if type(item) == "table" and type(item.filter) == "table" then
+            if type(item) == "table" and type(item.filter) == "table" and item.id then
                 for index2 = 1, select("#", ...) do
                     local filter = select(index2, ...)
                     if type(filter) == "table" then
                         for key, value in pairs(filter) do
                             if type(key) == "string" and value == true and item.filter[key] then
-                                item._removed = true
+                                if not items[item.id] then
+                                    items[item.id] = true,
+                                    results[#results + 1] = item
+                                end
                             end
                         end
                     elseif type(filter) == "string" then
                         if type(item.label) == "string" and string.match(item.label, filter) then
-                            item._removed = true
+                            if not items[item.id] then
+                                items[item.id] = true,
+                                results[#results + 1] = item
+                            end
                         elseif type(item.value) == "string" and string.match(item.value, filter) then
-                            item._removed = true
+                            if not items[item.id] then
+                                items[item.id] = true,
+                                results[#results + 1] = item
+                            end
                         elseif type(item.label) == "table" and type(item.label[1]) == "string" and string.match(item.label[1], filter) then
-                            item._removed = true
+                            if not items[item.id] then
+                                items[item.id] = true,
+                                results[#results + 1] = item
+                            end
                         elseif type(item.value) == "table" and type(item.value[1]) == "string" and string.match(item.value[1], filter) then
-                            item._removed = true
+                            if not items[item.id] then
+                                items[item.id] = true,
+                                results[#results + 1] = item
+                            end
                         end
                     end
                 end
             end
         end
+        return results
+    end
+
+    this.remove = function(self, ...)
+        local results = self:filter(...)
+        for index = 1, #results do
+            results[index]._removed = true
+        end
         return self
     end
     
     this.reinsert = function(self, ...)
-        for index = 1, #self do
-            local item = self[index]
-            if type(item) == "table" and type(item.filter) == "table" then
-                for index2 = 1, select("#", ...) do
-                    local filter = select(index2, ...)
-                    if type(filter) == "table" then
-                        for key, value in pairs(filter) do
-                            if type(key) == "string" and value == true and item.filter[key] then
-                                item._removed = nil
-                            end
-                        end
-                    elseif type(filter) == "string" then
-                        if type(item.label) == "string" and string.match(item.label, filter) then
-                            item._removed = nil
-                        elseif type(item.value) == "string" and string.match(item.value, filter) then
-                            item._removed = nil
-                        elseif type(item.label) == "table" and type(item.label[1]) == "string" and string.match(item.label[1], filter) then
-                            item._removed = nil
-                        elseif type(item.value) == "table" and type(item.value[1]) == "string" and string.match(item.value[1], filter) then
-                            item._removed = nil
-                        end
-                    end
-                end
-            end
+        local results = self:filter(...)
+        for index = 1, #results do
+            results[index]._removed = nil
         end
         return self
     end

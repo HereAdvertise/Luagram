@@ -199,6 +199,21 @@ local function format(values)
     return result, number
 end
 
+local function filters(value, ...)
+    local result = {}
+    if type(value) == "table" then
+        for key in pairs(value) do
+            if type(key) == "string" then
+                result[key] = true
+            end
+        end
+    end
+    for index = 1, select("#", ...) do
+        result[select(index, ...)] = true
+    end
+    return result
+end
+
 local function text(self, value)
     if type(value) == "table" then
         if type(value[1]) == "string" then
@@ -258,7 +273,7 @@ local function parse_compose(chat, compose, only_content, ...)
 
     while index <= #compose do
         local item = compose[index]
-        if type(item) == "table" and item._type and item._indexed ~= compose._id then
+        if type(item) == "table" and item._type and item._indexed ~= compose._id and item._removed ~= true then
             item._indexed = compose._id
 
             -- runtime
@@ -934,7 +949,8 @@ addons.compose = function(self)
         end
     end
 
-    local function simple(_type, arg1) -- luacheck: ignore
+    local function simple(_type, arg1, ...) -- luacheck: ignore
+        local filter = list(...)
         return function(self, ...)
             local index, value1 = ...
             local _index
@@ -945,13 +961,15 @@ addons.compose = function(self)
             end
             insert(self, _index, {
                 _type = _type,
-                [arg1] = value1
+                [arg1] = value1,
+                filter = filters(value1, _type, unlist(filter))
             })
             return self
         end
     end
 
-    local function multiple(_type, arg1, arg2) -- luacheck: ignore
+    local function multiple(_type, arg1, arg2, ...) -- luacheck: ignore
+        local filter = list(...)
         return function(self, ...)
             local index, value1, value2 = ...
             local _index
@@ -964,7 +982,8 @@ addons.compose = function(self)
             insert(self, _index, {
                 _type = _type,
                 [arg1] = value1,
-                [arg2] = value2
+                [arg2] = value2,
+                filter = filters(value1, _type, unlist(filter))
             })
             return self
         end
@@ -976,7 +995,7 @@ addons.compose = function(self)
 
     for index = 1, #items do
         local _type = items[index]
-        compose[_type] = simple(_type, "value")
+        compose[_type] = simple(_type, "value", "content")
     end
 
     compose.run = function(self, ...)
@@ -999,6 +1018,7 @@ addons.compose = function(self)
             _type = "run",
             run = run,
             args = args,
+            filter = filters(nil, "run", "runtime")
         })
         return self
     end
@@ -1019,6 +1039,7 @@ addons.compose = function(self)
             _type = "link",
             url = url,
             label = label,
+            filter = filters(label, "link", "content")
         })
         return self
     end
@@ -1044,11 +1065,12 @@ addons.compose = function(self)
             _type = "mention",
             user = user,
             name = name,
+            filter = filters(name, "mention", "content")
         })
         return self
     end
 
-    compose.emoji = multiple("emoji", "placeholder", "emoji")
+    compose.emoji = multiple("emoji", "placeholder", --[[filters:]] "emoji", "content")
 
     compose.code = function(self, ...)
         local index, language, code = ...
@@ -1067,6 +1089,7 @@ addons.compose = function(self)
             _type = "code",
             code = code,
             language = language,
+            filter = filters(nil, "code", "content")
         })
         return self
     end
@@ -1081,20 +1104,21 @@ addons.compose = function(self)
         end
         insert(self, _index, {
             _type = "line",
-            value = line
+            value = line,
+            filter = filters(nil, "line", "content")
         })
         return self
     end
 
-    compose.media = multiple("media", "media", "spoiler")
+    compose.media = multiple("media", "media", "spoiler", --[[filters:]] "misc", "media")
 
-    compose.title = simple("title", "title")
+    compose.title = simple("title", "title", --[[filters:]] "content", "transaction")
 
-    compose.description = simple("description", "description")
+    compose.description = simple("description", "description", --[[filters:]] "content", "transaction")
 
-    compose.price = multiple("price", "label", "amount")
+    compose.price = multiple("price", "label", "amount", --[[filters:]] "content", "transaction")
 
-    compose.data = multiple("data", "key", "value")
+    compose.data = multiple("data", "key", "value", --[[filters:]] "misc")
 
     compose.button = function(self, ...)
         local index, label, event, arg = ...
@@ -1116,7 +1140,8 @@ addons.compose = function(self)
             _type = "button",
             label = label,
             event = event,
-            arg = arg
+            arg = arg,
+            filter = filters(label, "button", "keyboard")
         })
         return self
     end
@@ -1138,7 +1163,8 @@ addons.compose = function(self)
             id = id(self),
             label = label,
             action = action,
-            args = args
+            args = args,
+            filter = filters(label, "action", "keyboard")
         })
         return self
     end
@@ -1155,7 +1181,8 @@ addons.compose = function(self)
         insert(self, _index, {
             _type = "location",
             label = label,
-            location = location
+            location = location,
+            filter = filters(label, "location", "keyboard")
         })
         return self
     end
@@ -1190,7 +1217,8 @@ addons.compose = function(self)
             id = id(self),
             label = label,
             transaction = transaction,
-            args = args
+            args = args,
+            filter = filters(label, "transaction", "keyboard")
         })
         return self
     end
@@ -1202,7 +1230,8 @@ addons.compose = function(self)
             _index = index
         end
         insert(self, _index, {
-            _type = "row"
+            _type = "row",
+            filter = filters(nil, "row", "keyboard")
         })
         return self
     end
@@ -1703,40 +1732,61 @@ local function callback_query(self, chat_id, language_code, update_data)
         return nil
     end
 
-    this.clear = function(self, _type) -- luacheck: ignore
-        local runtime = {
-            run = true
-        }
-        local content = {
-            text = true, bold = true, italic = true, underline = true, spoiler = true, strike = true, link = true, mention = true, mono = true, pre = true, line = true, html = true, quote = true, close = true, title = true, description = true, price = true
-        }        
-        local misc = {
-            media = true, data = true
-        }
-        local keyboard = {
-            button = true, action = true, location = true, transaction = true, row = true
-        }
+    this.remove = function(self, ...)
         for index = 1, #self do
             local item = self[index]
-            if _type == "runtime" and type(item) == "table" then
-                if runtime[item._type] then
-                    self[index] = true
+            if type(item) == "table" and type(item.filter) == "table" then
+                for index2 = 1, select("#", ...) do
+                    local filter = select(index2, ...)
+                    if type(filter) == "table" then
+                        for key, value in pairs(filter) do
+                            if type(key) == "string" and value == true and item.filter[key] then
+                                item._removed = true
+                            end
+                        end
+                    elseif type(filter) == "string" then
+                        if type(item.label) == "string" and string.match(item.label, filter) then
+                            item._removed = true
+                        elseif type(item.value) == "string" and string.match(item.value, filter) then
+                            item._removed = true
+                        elseif type(item.label) == "table" and type(item.label[1]) == "string" and string.match(item.label[1], filter) then
+                            item._removed = true
+                        elseif type(item.value) == "table" and type(item.value[1]) == "string" and string.match(item.value[1], filter) then
+                            item._removed = true
+                        end
+                    end
                 end
-            elseif _type == "content" and type(item) == "table" then
-                if content[item._type] then
-                    self[index] = true
-                end
-            elseif _type == "misc" and type(item) == "table" then
-                if misc[item._type] then
-                    self[index] = true
-                end
-            elseif _type == "keyboard" and type(item) == "table" then
-                if keyboard[item._type] then
-                    self[index] = true
-                end            
             end
         end
-
+        return self
+    end
+    
+    this.reinsert = function(self, ...)
+        for index = 1, #self do
+            local item = self[index]
+            if type(item) == "table" and type(item.filter) == "table" then
+                for index2 = 1, select("#", ...) do
+                    local filter = select(index2, ...)
+                    if type(filter) == "table" then
+                        for key, value in pairs(filter) do
+                            if type(key) == "string" and value == true and item.filter[key] then
+                                item._removed = nil
+                            end
+                        end
+                    elseif type(filter) == "string" then
+                        if type(item.label) == "string" and string.match(item.label, filter) then
+                            item._removed = nil
+                        elseif type(item.value) == "string" and string.match(item.value, filter) then
+                            item._removed = nil
+                        elseif type(item.label) == "table" and type(item.label[1]) == "string" and string.match(item.label[1], filter) then
+                            item._removed = nil
+                        elseif type(item.value) == "table" and type(item.value[1]) == "string" and string.match(item.value[1], filter) then
+                            item._removed = nil
+                        end
+                    end
+                end
+            end
+        end
         return self
     end
 
@@ -1756,7 +1806,7 @@ local function callback_query(self, chat_id, language_code, update_data)
         return self
     end
     
-    this:clear("runtime")
+    this:remove({runtime = true})
 
     local _ = (function(success, response, ...)
 
@@ -1768,7 +1818,7 @@ local function callback_query(self, chat_id, language_code, update_data)
         if response == true then
             this = self.compose.clone(action.compose._origin)
         elseif response == false then
-            this:clear("buttons")
+            this:remove({keyboard = true})
         elseif type(response) == "string" then
             local object = self.__super._objects[response]
             if object then
@@ -2247,7 +2297,7 @@ local function parse_update(self, update)
 
                 self.__super._transaction_report_compose = self.__super._transaction_report_compose or self.__super:compose(false)
                     :run(function(self, payment_data, response_data)
-                        self:clear("texts"):bold({"New Payment Received"}):line():line()
+                        self:remove({content = true}):bold({"New Payment Received"}):line():line()
                         local function serialize(payment_data, level)
                             if level > 10 then
                                 return

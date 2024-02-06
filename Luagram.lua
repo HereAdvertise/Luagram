@@ -17,10 +17,12 @@ end
 
 local function stdout(message)
     io.stdout:write("(Luagram) ", os.date("!%Y-%m-%d %H:%M:%S GMT: "), tostring(message), "\n")
+    io.stdout:flush()
 end
 
 local function stderr(message)
     io.stderr:write("(Luagram) ", os.date("!%Y-%m-%d %H:%M:%S GMT: "), "[Error] ", tostring(message), "\n")
+    io.stderr:flush()
 end
 
 local function request(self, url, options)
@@ -108,28 +110,32 @@ local function telegram(self, method, data, multipart)
         end
     end
     if not multipart then
-        stderr("-->".. tostring(method).. tostring(body))
+        stdout("-->".. tostring(method).. tostring(body))
     else
-        stderr("--> (multipart)".. tostring(method))
+        stdout("--> (multipart)".. tostring(method))
     end
     local response, response_status, response_headers = request(self, api, {
         method = "POST",
         body = body,
         headers = headers
     })
-    stderr("<--".. tostring(response)..tostring(response_status))
-    local ok, result, err = pcall(self.__super._json_decoder, response)
-    if ok and type(result) == "table" then
-        if not result.ok then
-            return false, string.format("%s: %s", result.error_code or "?", result.description or ""), response, response_status, response_headers
+    stdout("<--".. tostring(response)..tostring(response_status))
+    local result, err
+    if response_status == 200 then
+        local ok
+        ok, result, err = pcall(self.__super._json_decoder, response)
+        if ok and type(result) == "table" then
+            if not result.ok then
+                return false, string.format("%s: %s", result.error_code or "?", result.description or ""), response, response_status, response_headers
+            end
+            result = result.result
+            if type(result) == "table" then
+                result._response = response
+            end
+            return result, response, response_status, response_headers
         end
-        result = result.result
-        if type(result) == "table" then
-            result._response = response
-        end
-        return result, response, response_status, response_headers
     end
-    return nil, tostring(result or err), response, response_status, response_headers
+    return nil, tostring(result or err or response), response, response_status, response_headers
 end
 
 local function escape(text)
@@ -856,7 +862,7 @@ addons.compose = function(self)
             self._name = name
         end
         if name ~= false then
-            self.__super._objects[name] = self
+            self.__super._objects[self._name] = self
         end
         self._dispatch = {}
         self._predispatch = {}
@@ -1676,15 +1682,15 @@ local function callback_query(self, chat_id, language_code, update_data)
         return self._update_data, self._update_type
     end
 
-    this.this = function(self, label, action, ...)
+    this.this = function(self, new_label, new_action, ...)
         for index = 1, #self do
             if type(self[index]) == "table" and self[index]._type == "action" and self[index].id == action.id then
-                self[index].index = index
-                if label ~= nil then
-                    self[index].label = label
+                self[index].position = index + 1
+                if new_label ~= nil then
+                    self[index].label = new_label
                 end
-                if action ~= nil then
-                    self[index].action = action
+                if new_action ~= nil then
+                    self[index].action = new_action
                 end
                 if select("#", ...) > 0 then
                     self[index].args = list(...)
@@ -1699,8 +1705,11 @@ local function callback_query(self, chat_id, language_code, update_data)
         local buttons = {
             button = true, action = true, location = true, transaction = true, row = true
         }
-        local texts ={
+        local texts = {
             text = true, bold = true, italic = true, underline = true, spoiler = true, strike = true, link = true, mention = true, mono = true, pre = true, line = true, html = true, quote = true, close = true, title = true, description = true, price = true
+        }
+        local runtime = {
+            run = true
         }
         for index = 1, #self do
             local item = self[index]
@@ -1710,6 +1719,10 @@ local function callback_query(self, chat_id, language_code, update_data)
                 end
             elseif _type == "texts" and type(item) == "table" then
                 if texts[item._type] then
+                    self[index] = true
+                end
+            elseif _type == "runtime" and type(item) == "table" then
+                if runtime[item._type] then
                     self[index] = true
                 end
             end
@@ -1733,6 +1746,8 @@ local function callback_query(self, chat_id, language_code, update_data)
         answer.url = url
         return self
     end
+    
+    this:clear("runtime")
 
     local _ = (function(success, response, ...)
 
@@ -2493,6 +2508,7 @@ function Luagram:start()
                     _G.unix.nanosleep(1)
                     return polling() -- tail call
                 end
+                polling()
             end
         end
         return self
@@ -2526,6 +2542,7 @@ function Luagram:start()
                 collectgarbage()
                 return polling() -- tail call
             end
+            polling()
             return self
         end
     end

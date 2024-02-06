@@ -883,9 +883,9 @@ addons.compose = function(self)
             end
         end
         return value
-    end, function(self, value, ...)
+    end, function(self, value)
         if type(value) == "function" then
-            return self:run(value, ...)
+            return self:run(value)
         elseif type(value) == "string" then
             return self:text(value)
         else

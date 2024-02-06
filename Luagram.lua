@@ -1205,8 +1205,8 @@ addons.compose = function(self)
         return self
     end
 
-    compose.parse = function(self, ...)
-        return parse_compose(nil, self:clone(), true, unlist(select("#", ...) > 0 and list(...)))
+    compose.content = function(self, ...)
+        return parse_compose(nil, self:clone(), true, unlist(select("#", ...) > 0 and list(...) or list()))
     end
 
     compose.dispatch = function(self, dispatch, before)

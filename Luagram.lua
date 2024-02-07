@@ -1737,37 +1737,37 @@ local function callback_query(self, chat_id, language_code, update_data)
         local items = {}
         for index = 1, #self do
             local item = self[index]
-            if type(item) == "table" and type(item.filter) == "table" and item.id then
+            if type(item) == "table" and type(item.filter) == "table" then
                 for index2 = 1, select("#", ...) do
                     local filter = select(index2, ...)
                     if type(filter) == "table" then
                         for key, value in pairs(filter) do
                             if type(key) == "string" and value == true and item.filter[key] then
-                                if not items[item.id] then
-                                    items[item.id] = true,
+                                if not items[item] then
+                                    items[item] = true
                                     results[#results + 1] = item
                                 end
                             end
                         end
                     elseif type(filter) == "string" then
                         if type(item.label) == "string" and string.match(item.label, filter) then
-                            if not items[item.id] then
-                                items[item.id] = true,
+                            if not items[item] then
+                                items[item] = true
                                 results[#results + 1] = item
                             end
                         elseif type(item.value) == "string" and string.match(item.value, filter) then
-                            if not items[item.id] then
-                                items[item.id] = true,
+                            if not items[item] then
+                                items[item] = true
                                 results[#results + 1] = item
                             end
                         elseif type(item.label) == "table" and type(item.label[1]) == "string" and string.match(item.label[1], filter) then
-                            if not items[item.id] then
-                                items[item.id] = true,
+                            if not items[item] then
+                                items[item] = true
                                 results[#results + 1] = item
                             end
                         elseif type(item.value) == "table" and type(item.value[1]) == "string" and string.match(item.value[1], filter) then
-                            if not items[item.id] then
-                                items[item.id] = true,
+                            if not items[item] then
+                                items[item] = true
                                 results[#results + 1] = item
                             end
                         end

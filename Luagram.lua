@@ -995,7 +995,7 @@ addons.compose = function(self)
 
     for index = 1, #items do
         local _type = items[index]
-        compose[_type] = simple(_type, "value", "content")
+        compose[_type] = simple(_type, "value", --[[filters:]] "content")
     end
 
     compose.run = function(self, ...)

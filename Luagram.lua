@@ -261,6 +261,24 @@ local function parse_compose(chat, compose, only_content, ...)
     local transaction_label = false
     local payload
 
+    compose.say = function(self, ...)
+        chat:say(...)
+        return self
+    end
+
+    compose.send = function(self, ...)
+        chat:send(...)
+        return self
+    end
+
+    compose.id = function()
+        return chat:id()
+    end
+
+    compose.language = function()
+        return chat:language()
+    end
+
     local open_tags = {}
     local function close_tags()
         for index = #open_tags, 1, -1  do
@@ -288,7 +306,7 @@ local function parse_compose(chat, compose, only_content, ...)
                     return ..., list(select(2, ...))
                 end)(pcall(item.run, compose, unlist(item.args["#"] > 0 and item.args or select("#", ...) > 0 and list(...) or compose._args)))
                 compose._runtime = nil
-                
+
                 if result == false then
                     return false
                 elseif result then
@@ -494,7 +512,7 @@ local function parse_compose(chat, compose, only_content, ...)
                     label = label,
                     action = item.action,
                     interactions = interactions,
-                    args = item.args["#"] > 0 and item.args or (select("#", ...) > 0 and list(...) or compose._args)
+                    args = item.args["#"] > 0 and item.args or (select("#", ...) > 0 and list(...) or list())
                 }
                 user.interactions[uuid] = interaction
                 row[#row + 1] = {
@@ -532,7 +550,7 @@ local function parse_compose(chat, compose, only_content, ...)
                     label = label,
                     transaction = item.transaction,
                     interactions = interactions,
-                    args = item.args["#"] > 0 and item.args or (select("#", ...) > 0 and list(...) or compose._args)
+                    args = item.args["#"] > 0 and item.args or (select("#", ...) > 0 and list(...) or list())
                 }
 
                 payload = uuid
@@ -800,7 +818,7 @@ send_object = function(self, chat_id, language_code, name, ...)
             end
 
         elseif result == nil then
-            error(string.format("parser error: %s", err))
+            error(string.format("%s: parser error: %s", this._name, err))
         end
 
     elseif object._type == "session" then
@@ -1861,11 +1879,7 @@ local function callback_query(self, chat_id, language_code, update_data)
         else
             error("invalid result")
         end
-        
-        for _, value in pairs(action.interactions) do
-            user.interactions[value] = nil
-        end
-        
+
         if action.compose._media then
             local media
             for index = #this, 1, -1 do
@@ -1880,9 +1894,15 @@ local function callback_query(self, chat_id, language_code, update_data)
         end
 
         local result, err = parse_compose(chat, this:clone(), false, unlist(select("#", ...) > 0 and list(...) or action.args))
-        if not result then
+        if result == nil then
             action.compose._catch(string.format("parser error: %s", err))
+        end
+        if not result then
             return
+        end
+        
+        for _, value in pairs(action.interactions) do
+            user.interactions[value] = nil
         end
 
         local ok, message

@@ -1581,7 +1581,7 @@ function Luagram.new(options)
         else
             error("invalid webhook")
         end
-        assert(type(self._webhook.url) ~= "string", "required option: webhook.url")
+        assert(type(self._webhook.url) == "string", "required option: webhook.url")
     end
     if not options.webhook then
         self._get_updates = {}

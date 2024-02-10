@@ -2544,8 +2544,6 @@ function Luagram:update(...)
         fm.logInfo("!!!!!!!!!!!!!!!!!!!7")
         self._redbean_mapshared:write(body)
         Write("ok")
-        local q = self._redbean_mapshared:wake(0)
-        fm.logInfo("!!!!!!!!!!!!!!!!!!!8="..tostring(q))
         return self
     end
     xpcall(function()
@@ -2572,22 +2570,22 @@ function Luagram:start()
                 _G.unix.sigaction(_G.unix.SIGKILL, _G.unix.exit)
                 _G.unix.sigaction(_G.unix.SIGTERM, _G.unix.exit)
                 fm.logInfo("????????????0")
+                local update
                 local function wait()
-                    fm.logInfo("????????????1="..self._redbean_mapshared:load(0))
-                    if self._redbean_mapshared:wait(0, 0, 0) ~= nil then
-                        local update = self._redbean_mapshared:read()
-                        self._redbean_mapshared:write("\0\0\0\0\0\0\0\0")
-                        fm.logInfo("????????????2="..update)
-                        local response = _G.DecodeJson(update)
+                    --fm.logInfo("????????????1="..self._redbean_mapshared:load(0))
+                    local current = self._redbean_mapshared:read()
+                    if update ~= current then
+                        local update = current
+                        local response = _G.DecodeJson(current)
                         if response then
                             self:update(response)
                         end
                     end
-                    fm.logInfo("????????????3")
+                    --fm.logInfo("????????????3")
                     collectgarbage()
                     return wait() -- tail call
                 end
-                self._redbean_mapshared:write("\0\0\0\0\0\0\0\0")
+                update = self._redbean_mapshared:read()
                 wait()
             end
         elseif self._get_updates then

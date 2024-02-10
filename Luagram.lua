@@ -2567,6 +2567,9 @@ function Luagram:start()
             self._redbean_mapshared = assert(_G.unix.mapshared(1024 * 1024)) -- ~1kb
             self._stop = false
             if assert(_G.unix.fork()) == 0 then
+                _G.unix.sigaction(_G.unix.SIGQUIT, _G.unix.exit)
+                _G.unix.sigaction(_G.unix.SIGABRT, _G.unix.exit)
+                _G.unix.sigaction(_G.unix.SIGKILL, _G.unix.exit)
                 _G.unix.sigaction(_G.unix.SIGTERM, _G.unix.exit)
                 fm.logInfo("????????????0")
                 local function wait()
@@ -2586,6 +2589,9 @@ function Luagram:start()
             end
         elseif self._get_updates then
             if assert(_G.unix.fork()) == 0 then
+                _G.unix.sigaction(_G.unix.SIGQUIT, _G.unix.exit)
+                _G.unix.sigaction(_G.unix.SIGABRT, _G.unix.exit)
+                _G.unix.sigaction(_G.unix.SIGKILL, _G.unix.exit)
                 _G.unix.sigaction(_G.unix.SIGTERM, _G.unix.exit)
                 self._stop = false
                 local offset

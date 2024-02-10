@@ -2537,6 +2537,7 @@ function Luagram:update(...)
         end
         self._redbean_mapshared:write(body)
         self._redbean_mapshared:wake(1)
+        Write("ok")
         return self
     end
     xpcall(function()

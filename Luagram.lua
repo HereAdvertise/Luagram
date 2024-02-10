@@ -121,7 +121,7 @@ local function telegram(self, method, data, multipart)
     })
     stdout("<--".. tostring(response)..tostring(response_status))
     local result, err
-    if response_status == 200 then
+    if tonumber(response_status) == 200 then
         local ok
         ok, result, err = pcall(self.__super._json_decoder, response)
         if ok and type(result) == "table" then
@@ -135,7 +135,7 @@ local function telegram(self, method, data, multipart)
             return result, response, response_status, response_headers
         end
     end
-    return nil, tostring(result or err or response), response, response_status, response_headers
+    return nil, string.format("%s: %s", response_status or "?", tostring(result or err or response or "")), response, response_status, response_headers
 end
 
 local function escape(text)
@@ -187,7 +187,7 @@ local function format(values)
     local ok
     ok, result = pcall(string.format, result, unpack(values, 2))
     if not ok then
-        error("invalid string found")
+        error(string.format("invalid string found: %s", result))
     end
     local number
     for key, value in pairs(values) do
@@ -856,7 +856,7 @@ send_object = function(self, chat_id, language_code, name, ...)
 
         end)(coroutine.resume(thread.main, thread.self, unlist(select("#", ...) > 0 and list(...) or object._args)))
 
-        if coroutine.status(thread.main) == "dead" then
+        if coroutine.status(thread.main)  ~= "suspended" then
             user.thread = nil
         end
         
@@ -865,10 +865,10 @@ send_object = function(self, chat_id, language_code, name, ...)
             if type(result) == "table" and result._name then
                 result = result._name
             end
-
-            send_object(self, chat._chat_id, chat._language_code, result, unlist(args["#"] > 0 and args or (select("#", ...) > 0 and list(...) or list())))
             
             user.thread = nil
+
+            send_object(self, chat._chat_id, chat._language_code, result, unlist(args["#"] > 0 and args or (select("#", ...) > 0 and list(...) or list())))
 
         end
 
@@ -1287,17 +1287,21 @@ end
 
 addons.session = function(self)
 
-    self:object("session", function(self, name, ...)
-        if name == nil then
-            name = "/start"
-        end
-
+    self:object("session", function(self, name, ...) 
         self._type = "session"
         self._id = id(self)
-        self._name = name
+        if name == true then
+            self._name = "/start"
+        elseif not name then
+            self._name = tostring(self._id)
+        else
+            self._name = name
+        end
+        if name ~= false then
+            self.__super._objects[self._name] = self
+        end
         self._args = list(...)
         self:catch(catch_error)
-        self.__super._objects[name] = self
     end, nil, function(self, value)
         if type(value) == "function" then
             return self:main(value)
@@ -1350,6 +1354,9 @@ addons.chat = function(self)
     local chat = self.chat
 
     chat.send = function(self, name, ...)
+         if type(name) == "table" and name._name then
+            name = name._name
+        end
         send_object(self, self._chat_id, self._language_code, name, ...)
         return self
     end
@@ -2371,7 +2378,7 @@ local function parse_update(self, update)
     end
     user.updated_at = os.time()
 
-    if update_type == "message" then
+    if update_type == "message" and update_data.text then
         local text = update_data.text
         local command, space, payload = string.match(text, "^(/[a-zA-Z0-9_]+)(.?)(.*)$")
         if command and self.__super._objects[command] then
@@ -2441,7 +2448,7 @@ local function parse_update(self, update)
 
                 end)(coroutine.resume(thread.main, update, unlist(response_args or list())))
 
-                if coroutine.status(thread.main) == "dead" then
+                if coroutine.status(thread.main) ~= "suspended" then
                     user.thread = nil
                 end
 
@@ -2450,10 +2457,10 @@ local function parse_update(self, update)
                     if type(result) == "table" and result._name then
                         result = result._name
                     end
+                    
+                    user.thread = nil
 
                     send_object(self, chat_id, language_code, result, unlist(args["#"] > 0 and args or list()))
-
-                    user.thread = nil
 
                 end
 
@@ -2463,16 +2470,8 @@ local function parse_update(self, update)
         end
     end
 
-    if update_type == "message" then
-
-        if send_object(self, chat_id, language_code, "/start") == true then
-            return self
-        end
-
-    end
-
     if self._events[update_type] then
-        if self._events[update_type](update) ~= false then
+        if self._events[update_type](update_data) ~= false then
             return self
         end
     end
@@ -2480,6 +2479,14 @@ local function parse_update(self, update)
     if self._events[true] then
         self._events[true](update)
         return self
+    end
+
+    if update_type == "message" then
+
+        if send_object(self, chat_id, language_code, "/start") == true then
+            return self
+        end
+
     end
 
     if self._events.unhandled then

@@ -2543,7 +2543,7 @@ function Luagram:update(...)
         end
         fm.logInfo("!!!!!!!!!!!!!!!!!!!7")
         self._redbean_mapshared:write(body)
-        self._redbean_mapshared:wake(0)
+        self._redbean_wmapshared:write("0")
         Write("ok")
         fm.logInfo("!!!!!!!!!!!!!!!!!!!8")
         return self
@@ -2565,6 +2565,7 @@ function Luagram:start()
                 self.__super:set_webhook(self._webhook)
             end
             self._redbean_mapshared = assert(_G.unix.mapshared(1024 * 1024)) -- ~1kb
+            self._redbean_wmapshared = assert(_G.unix.mapshared(1)) -- ~1kb
             self._stop = false
             if assert(_G.unix.fork()) == 0 then
                 _G.unix.sigaction(_G.unix.SIGQUIT, _G.unix.exit)
@@ -2573,11 +2574,11 @@ function Luagram:start()
                 _G.unix.sigaction(_G.unix.SIGTERM, _G.unix.exit)
                 fm.logInfo("????????????0")
                 local function wait()
-                    fm.logInfo("????????????1")
-                    self._redbean_mapshared:wait(0, 32)
+                    fm.logInfo("????????????1="..self._redbean_wmapshared:load(0))
+                    self._redbean_wmapshared:wait(0, 49)
+                    self._redbean_wmapshared:write("1")
                     local update = self._redbean_mapshared:read()
-                    self._redbean_mapshared:write(" ")
-                    fm.logInfo("????????????2")
+                    fm.logInfo("????????????2="..update)
                     local response = _G.DecodeJson(update)
                     if response then
                         self:update(update)
@@ -2586,7 +2587,7 @@ function Luagram:start()
                     collectgarbage()
                     return wait() -- tail call
                 end
-                self._redbean_mapshared:write(" ")
+                self._redbean_wmapshared:write("1")
                 wait()
             end
         elseif self._get_updates then

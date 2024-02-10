@@ -2574,13 +2574,14 @@ function Luagram:start()
                 fm.logInfo("????????????0")
                 local function wait()
                     fm.logInfo("????????????1="..self._redbean_mapshared:load(0))
-                    self._redbean_mapshared:wait(0, 0)
-                    local update = self._redbean_mapshared:read()
-                    self._redbean_mapshared:write("\0\0\0\0\0\0\0\0")
-                    fm.logInfo("????????????2="..update)
-                    local response = _G.DecodeJson(update)
-                    if response then
-                        self:update(response)
+                    if self._redbean_mapshared:wait(0, 0, 0) ~= nil then
+                        local update = self._redbean_mapshared:read()
+                        self._redbean_mapshared:write("\0\0\0\0\0\0\0\0")
+                        fm.logInfo("????????????2="..update)
+                        local response = _G.DecodeJson(update)
+                        if response then
+                            self:update(response)
+                        end
                     end
                     fm.logInfo("????????????3")
                     collectgarbage()

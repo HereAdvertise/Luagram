@@ -2575,7 +2575,7 @@ function Luagram:start()
                     --fm.logInfo("????????????1="..self._redbean_mapshared:load(0))
                     local current = self._redbean_mapshared:read()
                     if update ~= current then
-                        local update = current
+                        update = current
                         local response = _G.DecodeJson(current)
                         if response then
                             self:update(response)

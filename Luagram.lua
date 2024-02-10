@@ -2580,9 +2580,9 @@ function Luagram:start()
                         if response then
                             self:update(response)
                         end
+                        collectgarbage()
                     end
                     --fm.logInfo("????????????3")
-                    collectgarbage()
                     return wait() -- tail call
                 end
                 update = self._redbean_mapshared:read()

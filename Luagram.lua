@@ -2580,7 +2580,7 @@ function Luagram:start()
                     fm.logInfo("????????????2="..update)
                     local response = _G.DecodeJson(update)
                     if response then
-                        self:update(update)
+                        self:update(response)
                     end
                     fm.logInfo("????????????3")
                     collectgarbage()

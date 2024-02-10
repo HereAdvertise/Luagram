@@ -2535,7 +2535,7 @@ function Luagram:update(...)
         if _G.GetMethod() ~= "POST" then
             return false
         end
-        fm.logInfo("!!!!!!!!!!!!!!!!!!!6)
+        fm.logInfo("!!!!!!!!!!!!!!!!!!!6")
         local body = _G.GetBody()
         local response = _G.DecodeJson(body)
         if type(response) ~= "table" then

@@ -2586,6 +2586,7 @@ function Luagram:start()
                     collectgarbage()
                     return wait() -- tail call
                 end
+                wait()
             end
         elseif self._get_updates then
             if assert(_G.unix.fork()) == 0 then

@@ -2543,7 +2543,7 @@ function Luagram:update(...)
         end
         fm.logInfo("!!!!!!!!!!!!!!!!!!!7")
         self._redbean_mapshared:write(body)
-        self._redbean_mapshared:wake(1)
+        self._redbean_mapshared:wake(0)
         Write("ok")
         fm.logInfo("!!!!!!!!!!!!!!!!!!!8")
         return self

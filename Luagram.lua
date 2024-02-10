@@ -2544,7 +2544,8 @@ function Luagram:update(...)
         fm.logInfo("!!!!!!!!!!!!!!!!!!!7")
         self._redbean_mapshared:write(body)
         Write("ok")
-        fm.logInfo("!!!!!!!!!!!!!!!!!!!8")
+        local q = self._redbean_mapshared:wake(0)
+        fm.logInfo("!!!!!!!!!!!!!!!!!!!8="..tostring(q))
         return self
     end
     xpcall(function()

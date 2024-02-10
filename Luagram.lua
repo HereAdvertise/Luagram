@@ -2508,11 +2508,8 @@ function Luagram:json(value)
     return self.__super._json_encoder(value)
 end
 
-function Luagram:update(update)
-    if self._stop ~= false then
-        return self
-    end
-    if _G.GetRedbeanVersion and type(update) ~= "table" then
+function Luagram:update(...)
+    if _G.GetRedbeanVersion and select("#", ...) == 0 then
         if not self._webhook then
             return false
         end
@@ -2537,10 +2534,12 @@ function Luagram:update(update)
         self._redbean_mapshared:write(body)
         self._redbean_mapshared:wake(0)
         Write("ok")
-        return function()
-            return true
-        end
+        return true
     end
+    if self._stop ~= false then
+        return self
+    end
+    local update = ...
     xpcall(function()
         if type(update) ~= "table" then
             error(string.format("invalid update: %s", update))

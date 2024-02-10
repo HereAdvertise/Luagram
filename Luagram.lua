@@ -2508,45 +2508,38 @@ function Luagram:json(value)
     return self.__super._json_encoder(value)
 end
 
-function Luagram:update(...)
+function Luagram:update(update)
     if self._stop ~= false then
         return self
     end
-    local update = ...
-    if _G.GetRedbeanVersion and select("#", ...) == 0 then
-        fm.logInfo("!!!!!!!!!!!!!!!!!!!1")
+    if _G.GetRedbeanVersion and type(update) ~= "table" then
         if not self._webhook then
             return false
         end
-        fm.logInfo("!!!!!!!!!!!!!!!!!!!2")
         if not self._redbean_mapshared then
             return false
         end
-        fm.logInfo("!!!!!!!!!!!!!!!!!!!3")
         local path = string.match(self._webhook.url, "^[hH][tT][tT][pP][sS]?://.-/(.*)$")
         if not path or _G.GetPath() ~= string.format("/%s", path) then
             return false
         end
-        fm.logInfo("!!!!!!!!!!!!!!!!!!!4")
         if self._webhook.secret_token and _G.GetHeader("X-Telegram-Bot-Api-Secret-Token") ~= self._webhook.secret_token then
             return false
         end
-        fm.logInfo("!!!!!!!!!!!!!!!!!!!5")
         if _G.GetMethod() ~= "POST" then
             return false
         end
-        fm.logInfo("!!!!!!!!!!!!!!!!!!!6")
         local body = _G.GetBody()
         local response = _G.DecodeJson(body)
         if type(response) ~= "table" then
             return false
         end
-        fm.logInfo("!!!!!!!!!!!!!!!!!!!7")
         self._redbean_mapshared:write(body)
-        local q = self._redbean_mapshared:wake(0)
-        fm.logInfo("!!!!!!!!!!!!!!!!!!!8="..tostring(q))
+        self._redbean_mapshared:wake(0)
         Write("ok")
-        return self
+        return function()
+            return true
+        end
     end
     xpcall(function()
         if type(update) ~= "table" then
@@ -2567,24 +2560,16 @@ function Luagram:start()
             self._redbean_mapshared = assert(_G.unix.mapshared(1024 * 1024))
             self._stop = false
             if assert(_G.unix.fork()) == 0 then
-                _G.unix.sigaction(_G.unix.SIGQUIT, _G.unix.exit)
-                _G.unix.sigaction(_G.unix.SIGABRT, _G.unix.exit)
-                _G.unix.sigaction(_G.unix.SIGKILL, _G.unix.exit)
                 _G.unix.sigaction(_G.unix.SIGTERM, _G.unix.exit)
-                fm.logInfo("????????????0")
                 local function wait()
-                    --fm.logInfo("????????????1="..self._redbean_mapshared:load(0))
-                    fm.logInfo("????????????1="..self._redbean_mapshared:load(0))
                     self._redbean_mapshared:wait(0, 0)
                     local update = self._redbean_mapshared:read()
                     self._redbean_mapshared:write("\0\0\0\0\0\0\0\0")
-                    fm.logInfo("????????????2="..update)
                     local response = _G.DecodeJson(update)
                     if response then
                         self:update(response)
                     end
                     collectgarbage()
-                    --fm.logInfo("????????????3")
                     return wait() -- tail call
                 end
                 self._redbean_mapshared:write("\0\0\0\0\0\0\0\0")
@@ -2592,9 +2577,6 @@ function Luagram:start()
             end
         elseif self._get_updates then
             if assert(_G.unix.fork()) == 0 then
-                _G.unix.sigaction(_G.unix.SIGQUIT, _G.unix.exit)
-                _G.unix.sigaction(_G.unix.SIGABRT, _G.unix.exit)
-                _G.unix.sigaction(_G.unix.SIGKILL, _G.unix.exit)
                 _G.unix.sigaction(_G.unix.SIGTERM, _G.unix.exit)
                 self._stop = false
                 local offset

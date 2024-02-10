@@ -2574,7 +2574,7 @@ function Luagram:start()
                 fm.logInfo("????????????0")
                 local function wait()
                     fm.logInfo("????????????1")
-                    self._redbean_mapshared:wait(0, 123)
+                    self._redbean_mapshared:wait(0, 32)
                     local update = self._redbean_mapshared:read()
                     self._redbean_mapshared:write(" ")
                     fm.logInfo("????????????2")
@@ -2586,6 +2586,7 @@ function Luagram:start()
                     collectgarbage()
                     return wait() -- tail call
                 end
+                self._redbean_mapshared:write(" ")
                 wait()
             end
         elseif self._get_updates then

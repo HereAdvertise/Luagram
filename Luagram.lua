@@ -2514,30 +2514,38 @@ function Luagram:update(...)
     end
     local update = ...
     if _G.GetRedbeanVersion and select("#", ...) == 0 then
+        fm.logInfo("!!!!!!!!!!!!!!!!!!!1")
         if not self._webhook then
             return false
         end
+        fm.logInfo("!!!!!!!!!!!!!!!!!!!2")
         if not self._redbean_mapshared then
             return false
         end
+        fm.logInfo("!!!!!!!!!!!!!!!!!!!3")
         local path = string.match(self._webhook.url, "^[hH][tT][tT][pP][sS]?://.-/(.*)$")
         if not path or _G.GetPath() ~= string.format("/%s", path) then
             return false
         end
+        fm.logInfo("!!!!!!!!!!!!!!!!!!!4")
         if self._webhook.secret_token and _G.GetHeader("X-Telegram-Bot-Api-Secret-Token") ~= self._webhook.secret_token then
             return false
         end
+        fm.logInfo("!!!!!!!!!!!!!!!!!!!5")
         if _G.GetMethod() ~= "POST" then
             return false
         end
+        fm.logInfo("!!!!!!!!!!!!!!!!!!!6)
         local body = _G.GetBody()
         local response = _G.DecodeJson(body)
         if type(response) ~= "table" then
             return false
         end
+        fm.logInfo("!!!!!!!!!!!!!!!!!!!7")
         self._redbean_mapshared:write(body)
         self._redbean_mapshared:wake(1)
         Write("ok")
+        fm.logInfo("!!!!!!!!!!!!!!!!!!!8")
         return self
     end
     xpcall(function()
@@ -2560,14 +2568,18 @@ function Luagram:start()
             self._stop = false
             if assert(_G.unix.fork()) == 0 then
                 _G.unix.sigaction(_G.unix.SIGTERM, _G.unix.exit)
+                fm.logInfo("????????????0")
                 local function wait()
+                    fm.logInfo("????????????1")
                     self._redbean_mapshared:wait(0, 123)
                     local update = self._redbean_mapshared:read()
                     self._redbean_mapshared:write(" ")
+                    fm.logInfo("????????????2")
                     local response = _G.DecodeJson(update)
                     if response then
                         self:update(update)
                     end
+                    fm.logInfo("????????????3")
                     collectgarbage()
                     return wait() -- tail call
                 end

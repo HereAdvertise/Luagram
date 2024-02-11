@@ -2558,8 +2558,8 @@ function Luagram:update(...)
         end
         self._redbean_mapshared:write(body)
         if self._redbean_mapshared:wake(0) > 0 then
-            SetStatus(200)
-            Write("ok")
+            _G.SetStatus(200)
+            _G.Write("ok")
             return true
         end
         return false

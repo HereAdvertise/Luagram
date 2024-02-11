@@ -2601,7 +2601,7 @@ function Luagram:start()
                         self._catch(tostring(err))
                     end
                     collectgarbage()
-                    _G.unix.nanosleep(1)
+                    -- _G.unix.nanosleep(1)
                     return polling() -- tail call
                 end
                 polling()

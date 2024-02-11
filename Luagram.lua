@@ -208,9 +208,9 @@ end
 local function filters(value, ...)
     local result = {}
     if type(value) == "table" then
-        for key in pairs(value) do
-            if type(key) == "string" then
-                result[key] = true
+        for key, value in pairs(value) do
+            if value == true then
+                result[key] = value
             end
         end
     end
@@ -533,7 +533,7 @@ local function parse_compose(chat, compose, only_content, ...)
                         if value == true then
                             params[#params + 1] = string.format("%s", escape_path(key))
                         elseif type(value) == "string" or type(value) == "number" then
-                            params[#params + 1] = string.format("%s=%s", escape_path(key), escape_path(value))
+                            params[#params + 1] = string.format("%s=%s", escape_path(key), escape_path(tostring(value)))
                         end
                     end
                     params = table.concat(params, "&")
@@ -1801,35 +1801,25 @@ local function callback_query(self, chat_id, language_code, update_data)
                 for index2 = 1, select("#", ...) do
                     local filter = select(index2, ...)
                     if type(filter) == "table" then
-                        for key, value in pairs(filter) do
-                            if type(key) == "string" and value == true and item.filter[key] then
-                                if not items[item] then
-                                    items[item] = true
-                                    results[#results + 1] = item
-                                end
+                        for key in pairs(filter) do
+                            if item.filter[key] == true and not items[item] then
+                                items[item] = true
+                                results[#results + 1] = item
                             end
                         end
                     elseif type(filter) == "string" then
-                        if type(item.label) == "string" and string.match(item.label, filter) then
-                            if not items[item] then
-                                items[item] = true
-                                results[#results + 1] = item
-                            end
-                        elseif type(item.value) == "string" and string.match(item.value, filter) then
-                            if not items[item] then
-                                items[item] = true
-                                results[#results + 1] = item
-                            end
-                        elseif type(item.label) == "table" and type(item.label[1]) == "string" and string.match(item.label[1], filter) then
-                            if not items[item] then
-                                items[item] = true
-                                results[#results + 1] = item
-                            end
-                        elseif type(item.value) == "table" and type(item.value[1]) == "string" and string.match(item.value[1], filter) then
-                            if not items[item] then
-                                items[item] = true
-                                results[#results + 1] = item
-                            end
+                        if type(item.label) == "string" and string.match(item.label, filter) and not items[item] then
+                            items[item] = true
+                            results[#results + 1] = item
+                        elseif type(item.value) == "string" and string.match(item.value, filter) and not items[item] then
+                            items[item] = true
+                            results[#results + 1] = item
+                        elseif type(item.label) == "table" and type(item.label[1]) == "string" and string.match(item.label[1], filter) and not items[item] then
+                            items[item] = true
+                            results[#results + 1] = item
+                        elseif type(item.value) == "table" and type(item.value[1]) == "string" and string.match(item.value[1], filter) and not items[item] then
+                            items[item] = true
+                            results[#results + 1] = item
                         end
                     end
                 end

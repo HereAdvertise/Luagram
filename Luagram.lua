@@ -138,13 +138,19 @@ local function telegram(self, method, data, multipart)
     return nil, string.format("%s: %s", response_status or "?", tostring(result or err or response or "")), response, response_status, response_headers
 end
 
-local function escape(text)
+local function escape_html(text)
     return string.gsub(text, '[<>&"]', {
         ["<"] = "&lt;",
         [">"] = "&gt;",
         ["&"] = "&amp;",
         ['"'] = "&quot;"
     })
+end
+
+local function escape_path(text)
+    return string.gsub(text, "[%W]", function(char)
+        return string.format("%%%02X", string.byte(char))
+    end)
 end
 
 local function locale(self, value, number)
@@ -325,7 +331,7 @@ local function parse_compose(chat, compose, only_content, ...)
 
             -- content
             elseif item._type == "text" then
-                texts[#texts + 1] = escape(text(chat, item.value))
+                texts[#texts + 1] = escape_html(text(chat, item.value))
             elseif item._type == "bold" then
                 if open_tags.bold then
                     close_tags()
@@ -334,7 +340,7 @@ local function parse_compose(chat, compose, only_content, ...)
                 open_tags[#open_tags + 1] = "</b>"
                 texts[#texts + 1] = "<b>"
                 if item.value then
-                    texts[#texts + 1] = escape(text(chat, item.value))
+                    texts[#texts + 1] = escape_html(text(chat, item.value))
                     if not open_tags.open then
                         close_tags()
                     end
@@ -349,7 +355,7 @@ local function parse_compose(chat, compose, only_content, ...)
                 open_tags[#open_tags + 1] = "</i>"
                 texts[#texts + 1] = "<i>"
                 if item.value then
-                    texts[#texts + 1] = escape(text(chat, item.value))
+                    texts[#texts + 1] = escape_html(text(chat, item.value))
                     if not open_tags.open then
                         close_tags()
                     end
@@ -364,7 +370,7 @@ local function parse_compose(chat, compose, only_content, ...)
                 open_tags[#open_tags + 1] = "</u>"
                 texts[#texts + 1] = "<u>"
                 if item.value then
-                    texts[#texts + 1] = escape(text(chat, item.value))
+                    texts[#texts + 1] = escape_html(text(chat, item.value))
                     if not open_tags.open then
                         close_tags()
                     end
@@ -379,7 +385,7 @@ local function parse_compose(chat, compose, only_content, ...)
                 open_tags[#open_tags + 1] = "</tg-spoiler>"
                 texts[#texts + 1] = "<tg-spoiler>"
                 if item.value then
-                    texts[#texts + 1] = escape(text(chat, item.value))
+                    texts[#texts + 1] = escape_html(text(chat, item.value))
                     if not open_tags.open then
                         close_tags()
                     end
@@ -394,7 +400,7 @@ local function parse_compose(chat, compose, only_content, ...)
                 open_tags[#open_tags + 1] = "</s>"
                 texts[#texts + 1] = "<s>"
                 if item.value then
-                    texts[#texts + 1] = escape(text(chat, item.value))
+                    texts[#texts + 1] = escape_html(text(chat, item.value))
                     if not open_tags.open then
                         close_tags()
                     end
@@ -409,7 +415,7 @@ local function parse_compose(chat, compose, only_content, ...)
                 open_tags[#open_tags + 1] = "</blockquote>"
                 texts[#texts + 1] = "<blockquote>"
                 if item.value then
-                    texts[#texts + 1] = escape(text(chat, item.value))
+                    texts[#texts + 1] = escape_html(text(chat, item.value))
                     if not open_tags.open then
                         close_tags()
                     end
@@ -418,50 +424,50 @@ local function parse_compose(chat, compose, only_content, ...)
                 end
             elseif item._type == "close" then
                 if item.value then
-                    texts[#texts + 1] = escape(text(chat, item.value))
+                    texts[#texts + 1] = escape_html(text(chat, item.value))
                 end
                 close_tags()
             elseif item._type == "link" then
                 texts[#texts + 1] = '<a href="'
-                texts[#texts + 1] = escape(item.url)
+                texts[#texts + 1] = escape_html(item.url)
                 texts[#texts + 1] = '">'
-                texts[#texts + 1] = escape(text(chat, item.label))
+                texts[#texts + 1] = escape_html(text(chat, item.label))
                 texts[#texts + 1] = "</a>"
             elseif item._type == "mention" then
                 texts[#texts + 1] = '<a href="'
-                texts[#texts + 1] = escape(item.user)
+                texts[#texts + 1] = escape_html(item.user)
                 texts[#texts + 1] = '">'
-                texts[#texts + 1] = escape(text(chat, item.name))
+                texts[#texts + 1] = escape_html(text(chat, item.name))
                 texts[#texts + 1] = "</a>"
             elseif item._type == "emoji" then
                 texts[#texts + 1] = '<tg-emoji emoji-id="'
-                texts[#texts + 1] = escape(item.emoji)
+                texts[#texts + 1] = escape_html(item.emoji)
                 texts[#texts + 1] = '">'
-                texts[#texts + 1] = escape(text(chat, item.placeholder))
+                texts[#texts + 1] = escape_html(text(chat, item.placeholder))
                 texts[#texts + 1] = "</tg-emoji>"
             elseif item._type == "mono" then
                 texts[#texts + 1] = "<code>"
-                texts[#texts + 1] = escape(text(chat, item.value))
+                texts[#texts + 1] = escape_html(text(chat, item.value))
                 texts[#texts + 1] = "</code>"
             elseif item._type == "pre" then
                 texts[#texts + 1] = "<pre>"
-                texts[#texts + 1] = escape(text(chat, item.value))
+                texts[#texts + 1] = escape_html(text(chat, item.value))
                 texts[#texts + 1] = "</pre>"
             elseif item._type == "code" then
                 if item.language then
                     texts[#texts + 1] = '<pre><code class="language-'
-                    texts[#texts + 1] = escape(item.language)
+                    texts[#texts + 1] = escape_html(item.language)
                     texts[#texts + 1] = '">'
-                    texts[#texts + 1] = escape(text(chat, item.code))
+                    texts[#texts + 1] = escape_html(text(chat, item.code))
                 else
                     texts[#texts + 1] = "<pre><code>"
-                    texts[#texts + 1] = escape(text(chat, item.code))
+                    texts[#texts + 1] = escape_html(text(chat, item.code))
                 end
                 texts[#texts + 1] = "</code></pre>"
             elseif item._type == "line" then
                 if item.value then
                     texts[#texts + 1] = "\n"
-                    texts[#texts + 1] = escape(text(chat, item.value))
+                    texts[#texts + 1] = escape_html(text(chat, item.value))
                 end
                 texts[#texts + 1] = "\n"
             elseif item._type == "html" then
@@ -520,6 +526,18 @@ local function parse_compose(chat, compose, only_content, ...)
                     callback_data = uuid
                 }
             elseif not only_content and item._type == "location" then
+                if item.params then
+                    local params = {}
+                    for key, value in pairs(item.params) do
+                        params[#params + 1] = string.format("%s=%s", escape_path(key), escape_path(value))
+                    end
+                    params = table.concat(params, "&")
+                    if string.match(item.location, "[^%?#]$") then
+                        item.location = string.format("%s?%s", item.location, params)
+                    else
+                        item.location = string.format("%s%s", item.location, params)
+                    end
+                end
                 row[#row + 1] = {
                     text = text(chat, item.label),
                     url = item.location
@@ -1187,11 +1205,12 @@ addons.compose = function(self)
     end
 
     compose.location = function(self, ...)
-        local index, label, location = ...
+        local index, label, location, params = ...
         local _index
         if type(index) == "number" and select("#", ...) > 1 then
             _index = index
         else
+            params = location
             location = label
             label = index
         end
@@ -1199,6 +1218,7 @@ addons.compose = function(self)
             _type = "location",
             label = label,
             location = location,
+            params = params,
             filter = filters(label, "location", "keyboard")
         })
         return self

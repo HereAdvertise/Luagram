@@ -2535,8 +2535,9 @@ function Luagram:update(...)
         if self._redbean_mapshared:wake(0) > 0 then
             SetStatus(200)
             Write("ok")
+            return true
         end
-        return true
+        return false
     end
     if self._stop ~= false then
         return self

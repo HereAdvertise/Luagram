@@ -2535,6 +2535,9 @@ end
 
 function Luagram:update(...)
     if _G.GetRedbeanVersion and select("#", ...) == 0 then
+        if self._stop ~= false then
+            return false
+        end
         if not self._webhook then
             return false
         end

@@ -526,6 +526,7 @@ local function parse_compose(chat, compose, only_content, ...)
                     callback_data = uuid
                 }
             elseif not only_content and item._type == "location" then
+                local location = item.location
                 if item.params then
                     local params = {}
                     for key, value in pairs(item.params) do
@@ -533,14 +534,14 @@ local function parse_compose(chat, compose, only_content, ...)
                     end
                     params = table.concat(params, "&")
                     if string.match(item.location, "[^%?#]$") then
-                        item.location = string.format("%s?%s", item.location, params)
+                        location = string.format("%s?%s", location, params)
                     else
-                        item.location = string.format("%s%s", item.location, params)
+                        location = string.format("%s%s", location, params)
                     end
                 end
                 row[#row + 1] = {
                     text = text(chat, item.label),
-                    url = item.location
+                    url = location
                 }
             elseif not only_content and item._type == "transaction" then
                 if transaction then

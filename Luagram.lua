@@ -530,7 +530,11 @@ local function parse_compose(chat, compose, only_content, ...)
                 if item.params then
                     local params = {}
                     for key, value in pairs(item.params) do
-                        params[#params + 1] = string.format("%s=%s", escape_path(key), escape_path(value))
+                        if value == true then
+                            params[#params + 1] = string.format("%s", escape_path(key))
+                        elseif type(value) == "string" or type(value) == "number" then
+                            params[#params + 1] = string.format("%s=%s", escape_path(key), escape_path(value))
+                        end
                     end
                     params = table.concat(params, "&")
                     if string.match(item.location, "[^%?#]$") then

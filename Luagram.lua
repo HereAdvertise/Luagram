@@ -891,12 +891,11 @@ addons.compose = function(self)
         self._id = id(self)
         if name == true then
             self._name = "/start"
+            self.__super._objects[self._name] = self
         elseif not name then
             self._name = tostring(self._id)
         else
             self._name = name
-        end
-        if name ~= false then
             self.__super._objects[self._name] = self
         end
         self._dispatch = {}
@@ -1258,6 +1257,12 @@ addons.compose = function(self)
         return parse_compose(nil, self:clone(), true, unlist(select("#", ...) > 0 and list(...) or list()))
     end
 
+    compose.send = function(self, chat_id, language_code, ...)
+        local chat = self.__super:chat(chat_id, language_code)
+        chat:send(self, ...)
+        return self
+    end
+
     compose.dispatch = function(self, dispatch, before)
         if before then
             if dispatch == false then
@@ -1292,12 +1297,11 @@ addons.session = function(self)
         self._id = id(self)
         if name == true then
             self._name = "/start"
+            self.__super._objects[self._name] = self
         elseif not name then
             self._name = tostring(self._id)
         else
             self._name = name
-        end
-        if name ~= false then
             self.__super._objects[self._name] = self
         end
         self._args = list(...)
@@ -1314,6 +1318,12 @@ addons.session = function(self)
 
     session.main = function(self, main)
         self._main = main
+        return self
+    end
+
+    session.send = function(self, chat_id, language_code, ...)
+        local chat = self.__super:chat(chat_id, language_code)
+        chat:send(self, ...)
         return self
     end
 

@@ -257,15 +257,15 @@ local function parse_compose(chat, compose, only_content, ...)
 
     local media, media_type, media_spoiler
 
-    local title, description = {}, {}
-    local prices = {}
-
     local multipart = false
+
     local method = "message"
 
     local transaction = false
     local transaction_label = false
     local payload
+    local title, description = {}, {}
+    local prices = {}
 
     compose.say = function(self, ...)
         chat:say(...)
@@ -474,7 +474,7 @@ local function parse_compose(chat, compose, only_content, ...)
                 close_tags()
                 texts[#texts + 1] = text(chat, item.value)
 
-            -- content (extra)
+            -- transaction
             elseif not only_content and item._type == "title" then
                 title[#title + 1] = text(chat, item.title)
             elseif not only_content and item._type == "description" then
@@ -2443,8 +2443,8 @@ local function parse_update(self, update)
                     valid = true
                     response_args = args
                 elseif response and value == false then
-                    if response_args["#"] > 0 then
-                        thread.self:say(unlist(response_args))
+                    if args["#"] > 0 then
+                        thread.self:say(unlist(args))
                     end
                 elseif response and (type(value) == "string" or type(value) == "table") then
                     if type(value) == "table" and value._name then
@@ -2453,8 +2453,8 @@ local function parse_update(self, update)
                     user.thread = nil
                     send_object(self, chat_id, language_code, value, unlist(args["#"] > 0 and args or list()))
                 elseif response and value == nil then
-                    if response_args["#"] > 0 then
-                        thread.self:say(unlist(response_args))
+                    if args["#"] > 0 then
+                        thread.self:say(unlist(args))
                     end
                     user.thread = nil
                 end

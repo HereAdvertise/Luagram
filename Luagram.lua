@@ -2244,7 +2244,7 @@ end
 
 local function chat_id(update_data, update_type)
     if update_type == "callback_query" then
-        return update_data.message.chat.id, update_data.message.from.language_code
+        return update_data.message.chat.id, update_data.from.language_code
     elseif update_type == "pre_checkout_query" or update_type == "shipping_query" then
         return update_data.from.id, update_data.from.language_code
     end

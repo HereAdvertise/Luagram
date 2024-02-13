@@ -855,13 +855,21 @@ send_object = function(self, chat_id, language_code, name, ...)
 
         local thread = user.thread
 
-        chat.listen =  function(_, match)
+        chat.listen = function(_, match)
             if type(match) == "function" then
                 thread.match = match
             else
                 thread.match = nil
             end
             return coroutine.yield()
+        end
+
+        chat.cancel = function(self)
+            local user = users:get(self._chat_id)
+            if user then
+                user.thread = nil
+            end
+            return self
         end
 
         thread.main = coroutine.create(object._main)

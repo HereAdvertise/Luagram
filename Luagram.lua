@@ -111,7 +111,7 @@ local function telegram(self, method, data, multipart)
     end
     if self.__super._debug then
         if not multipart then
-            stdout(string.format("--> %s %s"), tostring(method), tostring(body))
+            stdout(string.format("--> %s %s", tostring(method), tostring(body)))
         else
             stdout(string.format("--> %s (multipart: %s)", tostring(method), tostring(multipart)))
         end

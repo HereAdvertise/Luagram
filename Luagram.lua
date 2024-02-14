@@ -2574,12 +2574,10 @@ function Luagram:update(...)
             return false
         end
         self._redbean_mapshared:write(body)
-        if self._redbean_mapshared:wake(0) > 0 then
-            _G.SetStatus(200)
-            _G.Write("ok")
-            return true
-        end
-        return false
+        self._redbean_mapshared:wake(0)
+        _G.SetStatus(200)
+        _G.Write("ok")
+        return true
     end
     if self._stop ~= false then
         return self

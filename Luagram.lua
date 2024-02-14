@@ -109,17 +109,21 @@ local function telegram(self, method, data, multipart)
             headers[string.lower(key)] = value
         end
     end
-    if not multipart then
-        stdout("-->".. tostring(method).. tostring(body))
-    else
-        stdout("--> (multipart)".. tostring(method))
+    if self.__super.logs then
+        if not multipart then
+            stdout(string.format("--> %s %s"), tostring(method), tostring(body))
+        else
+            stdout(string.format("--> %s (multipart: %s)", tostring(method), tostring(multipart)))
+        end
     end
     local response, response_status, response_headers = request(self, api, {
         method = "POST",
         body = body,
         headers = headers
     })
-    stdout("<--".. tostring(response)..tostring(response_status))
+    if self.__super.logs then
+        stdout(string.format("<-- %s (status: %s)",  tostring(response), tostring(response_status)))
+    end
     local result, err
     if tonumber(response_status) == 200 then
         local ok
@@ -1530,6 +1534,8 @@ function Luagram.new(options)
     self._http_provider = options.http_provider
     self._json_encoder = options.json_encoder
     self._json_decoder = options.json_decoder
+
+    self._logs = options.logs
 
     if not options.http_provider then
         if _G.GetRedbeanVersion then

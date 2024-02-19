@@ -783,13 +783,13 @@ send_object = function(self, chat_id, language_code, name, ...)
     user.updated_at = os.time()
 
     local object
-    
+
     if type(name) == "string" then
         object = objects[name]
         if not object then
             error(string.format("object not found: %s", name))
         end
-    elseif type(name) == "table" and name.__type then
+    elseif type(name) == "table" and name._type then
         object = name
         if not object then
             error(string.format("object not found: %s", name._name))
@@ -1504,7 +1504,8 @@ function Luagram.new(options)
 
     if type(options) == "string" then
         options = {
-            token = options
+            token = options,
+            debug = true
         }
     end
 

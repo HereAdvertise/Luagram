@@ -847,7 +847,7 @@ send_object = function(self, chat_id, language_code, name, ...)
             end
 
             for index = 1, #object._dispatch do
-                object._dispatch[index](ok)
+                object._dispatch[index](result, ok)
             end
 
         elseif result == nil then

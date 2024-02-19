@@ -1693,7 +1693,7 @@ function Luagram:addon(name, ...)
         return addons[name](self, ...) or self
     end
     local path = package.path
-    package.path = "./addons/?.lua;" .. path
+    package.path = "addons/?.lua;" .. path
     local ok, addon = pcall(require, name)
     package.path = path
     if not ok then
@@ -1706,7 +1706,7 @@ function Luagram:locales(locales)
 
     if type(locales) == "string" then
         local path = package.path
-        package.path = "./locales/?.lua;" .. path
+        package.path = "locales/?.lua;" .. path
         local ok, addon = pcall(require, locales)
         package.path = path
         if not ok then

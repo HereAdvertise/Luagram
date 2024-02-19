@@ -324,10 +324,6 @@ local function parse_compose(chat, compose, only_content, ...)
                         return false
                     end
 
-                    if type(result) == "table" and result._name then
-                        result = result._name
-                    end
-
                     send_object(compose, chat._chat_id, chat._language_code, result, unlist(args["#"] > 0 and args or (select("#", ...) > 0 and list(...) or list())))
 
                     return false
@@ -786,10 +782,18 @@ send_object = function(self, chat_id, language_code, name, ...)
     end
     user.updated_at = os.time()
 
-    local object = objects[name]
-
-    if not object then
-        error(string.format("object not found: %s", name))
+    local object
+    
+    if type(name) == "string" then
+        object = objects[name]
+        if not object then
+            error(string.format("object not found: %s", name))
+        end
+    elseif type(name) == "table" and name.__type then
+        object = name
+        if not object then
+            error(string.format("object not found: %s", name._name))
+        end
     end
 
     local chat = self.__super:chat(chat_id, language_code)
@@ -896,11 +900,7 @@ send_object = function(self, chat_id, language_code, name, ...)
         end
         
         if result then
-                    
-            if type(result) == "table" and result._name then
-                result = result._name
-            end
-            
+
             user.thread = nil
 
             send_object(self, chat._chat_id, chat._language_code, result, unlist(args["#"] > 0 and args or (select("#", ...) > 0 and list(...) or list())))
@@ -1401,9 +1401,6 @@ addons.chat = function(self)
     local chat = self.chat
 
     chat.send = function(self, name, ...)
-         if type(name) == "table" and name._name then
-            name = name._name
-        end
         send_object(self, self._chat_id, self._language_code, name, ...)
         return self
     end
@@ -1916,7 +1913,7 @@ local function callback_query(self, chat_id, language_code, update_data)
                 chat_id = chat_id,
                 message_id = update_data.message.message_id
             })
-            send_object(self, chat_id, language_code, response._name, unlist(select("#", ...) > 0 and list(...) or action.args))
+            send_object(self, chat_id, language_code, response, unlist(select("#", ...) > 0 and list(...) or action.args))
             return
         elseif type(response) == "table" and response._type == "compose" then
             this = response
@@ -2461,9 +2458,6 @@ local function parse_update(self, update)
                         thread.self:say(unlist(args))
                     end
                 elseif response and (type(value) == "string" or type(value) == "table") then
-                    if type(value) == "table" and value._name then
-                        value = value._name
-                    end
                     user.thread = nil
                     send_object(self, chat_id, language_code, value, unlist(args["#"] > 0 and args or list()))
                 elseif response and value == nil then
@@ -2492,10 +2486,6 @@ local function parse_update(self, update)
                 end
 
                 if result then
-
-                    if type(result) == "table" and result._name then
-                        result = result._name
-                    end
                     
                     user.thread = nil
 

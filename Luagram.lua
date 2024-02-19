@@ -794,6 +794,8 @@ send_object = function(self, chat_id, language_code, name, ...)
         if not object then
             error(string.format("object not found: %s", name._name))
         end
+    else
+        error("invalid object")
     end
 
     local chat = self.__super:chat(chat_id, language_code)

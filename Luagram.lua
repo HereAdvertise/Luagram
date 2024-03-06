@@ -518,7 +518,7 @@ local function parse_compose(chat, compose, only_content, ...)
                     label = label,
                     action = item.action,
                     interactions = interactions,
-                    args = item.args["#"] > 0 and item.args or (select("#", ...) > 0 and list(...) or list())
+                    args = item.args["#"] > 0 and item.args or list() -- (select("#", ...) > 0 and list(...) or list())
                 }
                 user.interactions[uuid] = interaction
                 row[#row + 1] = {
@@ -573,7 +573,7 @@ local function parse_compose(chat, compose, only_content, ...)
                     label = label,
                     transaction = item.transaction,
                     interactions = interactions,
-                    args = item.args["#"] > 0 and item.args or (select("#", ...) > 0 and list(...) or list())
+                    args = item.args["#"] > 0 and item.args or list() --(select("#", ...) > 0 and list(...) or list())
                 }
 
                 payload = uuid
@@ -1938,8 +1938,8 @@ local function callback_query(self, chat_id, language_code, update_data)
                 this:media(action.compose._media)
             end
         end
-
-        local result, err = parse_compose(chat, this:clone(), false, unlist(select("#", ...) > 0 and list(...) or action.args))
+print("!!!!!!!!!!!!!!", ...)
+        local result, err = parse_compose(chat, this:clone(), false, unlist(select("#", ...) > 0 and list(...) or list()))
         if result == nil then
             action.compose._catch(string.format("parser error: %s", err))
         end

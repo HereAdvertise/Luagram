@@ -1,4 +1,4 @@
--- (c) 2023-2024 Propagram. MIT Licensed.
+-- (c) 2023-2024 HereAdvertise. MIT Licensed.
 
 local unpack = table.unpack or unpack
 
@@ -2249,12 +2249,16 @@ local function successful_payment(self, chat_id, language_code, update_data)
 end
 
 local function chat_id(update_data, update_type)
-    if update_type == "callback_query" then
-        return update_data.message.chat.id, update_data.from.language_code
-    elseif update_type == "pre_checkout_query" or update_type == "shipping_query" then
-        return update_data.from.id, update_data.from.language_code
+    local language = "en"
+    if update_data.from and update_data.from.language_code then
+        language = update_data.from.language_code
     end
-    return assert(update_data.chat.id, "chat_id not found"), update_data.from.language_code
+    if update_type == "callback_query" then
+        return update_data.message.chat.id, language
+    elseif update_type == "pre_checkout_query" or update_type == "shipping_query" then
+        return update_data.from.id, language
+    end
+    return assert(update_data.chat.id, "chat_id not found"), language
 end
 
 local function parse_update(self, update)

@@ -152,7 +152,7 @@ local function escape_html(text)
 end
 
 local function escape_path(text)
-    return string.gsub(text, "[%W]", function(char)
+    return string.gsub(text, "%W", function(char)
         return string.format("%%%02X", string.byte(char))
     end)
 end
@@ -944,7 +944,7 @@ addons.compose = function(self)
         local value = rawget(getmetatable(self), key)
         if value == nil and type(key) == "string" then
             local _chat_id = rawget(self, "_chat_id")
-            if _chat_id and not string.match(key, "^_") and not string.match(key, "^on_%w+$") then
+            if _chat_id and not string.match(key, "^_") and not string.match(key, "^on_[%w_]+$") then
                 return function(self, data, multipart)
                     if type(data) == "table" and data.chat_id == nil then
                         data.chat_id = _chat_id
@@ -1386,7 +1386,7 @@ addons.chat = function(self)
     end, function(self, key)
         local value = rawget(getmetatable(self), key)
         if value == nil and type(key) == "string" then
-            if not string.match(key, "^_") and not string.match(key, "^on_%w+$") then
+            if not string.match(key, "^_") and not string.match(key, "^on_[%w_]+$") then
                 return function(self, data, multipart)
                     if type(data) == "table" and data.chat_id == nil then
                         data.chat_id = rawget(self, "_chat_id")
@@ -1673,7 +1673,7 @@ end
 function Luagram:__index(key)
     local value = rawget(Luagram, key)
     if value == nil and type(key) == "string" then
-        local event = string.match(key, "^on_(%w+)$")
+        local event = string.match(key, "^on_([%w_]+)$")
         if event then
             return function(self, callback)
                 self._events[event] = callback

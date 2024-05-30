@@ -1970,7 +1970,7 @@ local function callback_query(self, chat_id, language_code, update_data)
                 this:media(action.compose._media)
             end
         end
-print("!!!!!!!!!!!!!!", ...)
+
         local result, err = parse_compose(chat, this:clone(), false, unlist(select("#", ...) > 0 and list(...) or list()))
         if result == nil then
             action.compose._catch(string.format("parser error: %s", err))
@@ -2252,19 +2252,19 @@ local function successful_payment(self, chat_id, language_code, update_data)
     local payload = update_data.successful_payment.invoice_payload
 
     if not payload:match("^Luagram_transaction_%d+_%d+_%d+$") then
-        return false
+        return false, "Transaction identifier not found in this session. Please manually contact the payer to resolve the outcome of this payment."
     end
 
     local user = self._users:get(chat_id)
 
     if not user then
-        return false
+        return false, "Transaction user not found in this session. Please manually contact the payer to resolve the outcome of this payment."
     end
 
     local transaction = user.interactions[payload]
 
     if not transaction then
-        return false
+        return false, "Transaction compose not found in this session. Please manually contact the payer to resolve the outcome of this payment."
     end
 
     local this = self:chat(chat_id, language_code)
@@ -2399,37 +2399,41 @@ local function parse_update(self, update)
 
         if (function(ok, ...)
 
-            if string.match(update_data.invoice_payload, "^Luagram_transaction_%d+_%d+_%d+$") then
-
-                self.__super._transaction_report_compose = self.__super._transaction_report_compose or self.__super:compose(false)
-                    :run(function(self, payment_data, response_data)
-                        self:remove({content = true}):bold({"New Payment Received"}):line():line()
-                        local function serialize(payment_data, level)
-                            if level > 10 then
-                                return
-                            end
-                            for key, value in pairs(payment_data) do
-                                if type(value) == "table" then
-                                    serialize(value, level and level + 1 or 1)
-                                else
-                                    self:text(("  "):rep(level or 0))
-                                    if key ~= "number" then
-                                        self:italic(tostring(key)):text(": ")
-                                    end
-                                    self:text(tostring(value)):line()
-                                end
-                            end
-                        end
-                        self:text({"Transaction Details:"}):line()
-                        serialize(payment_data)
-                        self:line():text({"Transaction Response:"}):line()
-                        serialize(response_data)
-                    end)
+            if string.match(update_data.successful_payment.invoice_payload, "^Luagram_transaction_%d+_%d+_%d+$") then
 
                 local admin = self.__super:chat(self.__super._transaction_report_to)
-                local response_data = {...}
-                response_data[1] = admin:text({"Compose Report: %s", tostring(response_data[1])})
-                admin:send(self.__super._transaction_report_compose, update_data.successful_payment, response_data)
+                local html = {"<b>Payment Report</b>", "", "<blockquote expandable><b>Telegram Response:</b>"}
+                local function serialize(items, level)
+                    if level > 10 then
+                        return
+                    end
+                    for key, value in pairs(items) do
+                        if type(value) == "table" then
+                            html[#html + 1] = string.format("<i>%s</i>:", tostring(key))
+                            serialize(value, level + 1)
+                        else
+                            html[#html + 1] = string.format("%s<i>%s</i>: %s", string.rep("  ", level), tostring(key), tostring(value))
+                        end
+                    end
+                end
+                serialize(update_data, 0)
+                html[#html + 1] = "</blockquote>"
+                html[#html + 1] = "<blockquote expandable><b>Luagram Response:</b>"
+                local response = {...}
+                if response[1] == true then
+                    response[1] = "Compose complete payment event executed without errors"
+                    if #response <= 1 then
+                        response[2] = "Compose complete payment event did not return any value. It is recommended that this event returns some value to report that everything is OK."
+                    end
+                elseif response[1] == false then
+                    response[1] = "An error occurred in the compose complete payment event. Manually check with the payer if everything is OK."
+                end
+                serialize(response, 0)
+                html[#html + 1] = "</blockquote>"
+                admin:send_message({
+                    text = table.concat(html, "\n"),
+                    parse_mode = "HTML"
+                })
 
                 ok = true
             end
@@ -2647,6 +2651,7 @@ function Luagram:start()
                 wait()
             end
         elseif self._get_updates then
+            self.__super:delete_webhook()
             if assert(_G.unix.fork()) == 0 then
                 _G.unix.sigaction(_G.unix.SIGTERM, _G.unix.exit)
                 self._stop = false
@@ -2685,6 +2690,7 @@ function Luagram:start()
             end
             self._stop = false
         elseif self._get_updates then
+            self.__super:delete_webhook()
             local offset
             self._stop = false
             local function polling()

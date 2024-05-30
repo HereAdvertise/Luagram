@@ -2565,12 +2565,10 @@ local function parse_update(self, update)
         return self
     end
 
-    if update_type == "message" then
-
+    if update_type == "message" and update_data.chat and update_data.chat.type == "private" then
         if send_object(self, chat_id, language_code, "/start") == true then
             return self
         end
-
     end
 
     if self._events.unhandled then

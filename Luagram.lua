@@ -241,7 +241,7 @@ end
 
 local send_object
 
-local function parse_compose(chat, compose, only_content, ...)
+local function parse_compose(chat, compose, only_content, update_type, update_data, ...)
 
     local users = chat.__super._users
 
@@ -324,7 +324,7 @@ local function parse_compose(chat, compose, only_content, ...)
                         return false
                     end
 
-                    send_object(compose, chat._chat_id, chat._language_code, result, unlist(args["#"] > 0 and args or (select("#", ...) > 0 and list(...) or list())))
+                    send_object(compose, chat._chat_id, chat._language_code, update_type, update_data, result, unlist(args["#"] > 0 and args or (select("#", ...) > 0 and list(...) or list())))
 
                     return false
                 end
@@ -773,7 +773,7 @@ local function parse_compose(chat, compose, only_content, ...)
     return compose, interactions
 end
 
-send_object = function(self, chat_id, language_code, name, ...)
+send_object = function(self, chat_id, language_code, update_type, update_data, name, ...)
 
     local users = self.__super._users
     local objects = self.__super._objects
@@ -823,8 +823,12 @@ send_object = function(self, chat_id, language_code, name, ...)
             chat:say(...)
             return self
         end
+        
+        this.source = function(self)
+            return update_type, update_data
+        end
 
-        local result, err = parse_compose(chat, this, false, ...)
+        local result, err = parse_compose(chat, this, false, update_type, update_data, ...)
 
         if result then
 
@@ -888,6 +892,10 @@ send_object = function(self, chat_id, language_code, name, ...)
             end
             return self
         end
+        
+        chat.source = function(self)
+            return update_type, update_data
+        end
 
         thread.main = coroutine.create(object._main)
         thread.object = object
@@ -912,7 +920,7 @@ send_object = function(self, chat_id, language_code, name, ...)
 
             user.thread = nil
 
-            send_object(self, chat._chat_id, chat._language_code, result, unlist(args["#"] > 0 and args or (select("#", ...) > 0 and list(...) or list())))
+            send_object(self, chat._chat_id, chat._language_code, update_type, update_data, result, unlist(args["#"] > 0 and args or (select("#", ...) > 0 and list(...) or list())))
 
         end
 
@@ -1325,7 +1333,7 @@ addons.compose = function(self)
     end
 
     compose.content = function(self, ...)
-        return parse_compose(nil, self:clone(), true, unlist(select("#", ...) > 0 and list(...) or list()))
+        return parse_compose(nil, self:clone(), true, nil, nil, unlist(select("#", ...) > 0 and list(...) or list()))
     end
 
     compose.send = function(self, chat_id, language_code, ...)
@@ -1435,7 +1443,7 @@ addons.chat = function(self)
     local chat = self.chat
 
     chat.send = function(self, name, ...)
-        send_object(self, self._chat_id, self._language_code, name, ...)
+        send_object(self, self._chat_id, self._language_code, nil, nil, name, ...)
         return self
     end
 
@@ -1944,7 +1952,7 @@ local function callback_query(self, chat_id, language_code, update_data)
                         chat_id = chat_id,
                         message_id = update_data.message.message_id
                     })
-                    send_object(self, chat_id, language_code, object._name, unlist(select("#", ...) > 0 and list(...) or action.args))
+                    send_object(self, chat_id, language_code, "callback_query", update_data, object._name, unlist(select("#", ...) > 0 and list(...) or action.args))
                     return
                 else
                    error(string.format("invalid object: %s", object._type))
@@ -1960,7 +1968,7 @@ local function callback_query(self, chat_id, language_code, update_data)
                 chat_id = chat_id,
                 message_id = update_data.message.message_id
             })
-            send_object(self, chat_id, language_code, response, unlist(select("#", ...) > 0 and list(...) or action.args))
+            send_object(self, chat_id, language_code, "callback_query", update_data, response, unlist(select("#", ...) > 0 and list(...) or action.args))
             return
         elseif type(response) == "table" and response._type == "compose" then
             this = response
@@ -1983,7 +1991,7 @@ local function callback_query(self, chat_id, language_code, update_data)
             end
         end
 
-        local result, err = parse_compose(chat, this:clone(), false, unlist(select("#", ...) > 0 and list(...) or list()))
+        local result, err = parse_compose(chat, this:clone(), false, "callback_query", update_data, unlist(select("#", ...) > 0 and list(...) or list()))
         if result == nil then
             action.compose._catch(string.format("parser error: %s", err))
         end
@@ -2373,7 +2381,7 @@ local function parse_update(self, update)
                     callback_query_id = update_data.id,
                     text = text(self:chat(chat_id, language_code), {"Welcome back! This message is outdated. Let's start over!"})
                 })
-                if send_object(self, chat_id, language_code, "/start") == true then
+                if send_object(self, chat_id, language_code, update_type, update_data, "/start") == true then
                     return self
                 end
             else
@@ -2482,11 +2490,11 @@ local function parse_update(self, update)
         local command, space, payload = string.match(text, "^(/[a-zA-Z0-9_]+)(.?)(.*)$")
         if command and self.__super._objects[command] then
             if space == " " and payload ~= "" then
-                if send_object(self, chat_id, language_code, command, payload) == true then
+                if send_object(self, chat_id, language_code, update_type, update_data, command, payload) == true then
                     return self
                 end
             else
-                if send_object(self, chat_id, language_code, command) == true then
+                if send_object(self, chat_id, language_code, update_type, update_data, command) == true then
                     return self
                 end
             end
@@ -2522,7 +2530,7 @@ local function parse_update(self, update)
                     end
                 elseif response and (type(value) == "string" or type(value) == "table") then
                     user.thread = nil
-                    send_object(self, chat_id, language_code, value, unlist(args["#"] > 0 and args or list()))
+                    send_object(self, chat_id, language_code, update_type, update_data, value, unlist(args["#"] > 0 and args or list()))
                 elseif response and value == nil then
                     if args["#"] > 0 then
                         thread.self:say(unlist(args))
@@ -2552,7 +2560,7 @@ local function parse_update(self, update)
                     
                     user.thread = nil
 
-                    send_object(self, chat_id, language_code, result, unlist(args["#"] > 0 and args or list()))
+                    send_object(self, chat_id, language_code, update_type, update_data, result, unlist(args["#"] > 0 and args or list()))
 
                 end
 
@@ -2574,7 +2582,7 @@ local function parse_update(self, update)
     end
 
     if update_type == "message" and update_data.chat and update_data.chat.type == "private" then
-        if send_object(self, chat_id, language_code, "/start") == true then
+        if send_object(self, chat_id, language_code, update_type, update_data, "/start") == true then
             return self
         end
     end

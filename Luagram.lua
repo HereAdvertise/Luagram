@@ -1577,8 +1577,20 @@ function Luagram.new(options)
             end
         elseif _G.ngx then
             local http = require("lapis.nginx.http")
+            local ltn12 = require("ltn12")
             self._http_provider = function(url, params)
-                return http.simple(url, params)
+                local out = {}
+                if not params then
+                    params = {}
+                end
+                if params.body then
+                    params.source = ltn12.source.string(params.body)
+                end
+                params.sink = ltn12.sink.table(out)
+                params.url = url
+                local _, status, headers = http.request(params)
+                local response = table.concat(out)
+                return response, status, headers
             end
         else
             local https = require("ssl.https")

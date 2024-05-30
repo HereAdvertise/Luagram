@@ -825,7 +825,7 @@ send_object = function(self, chat_id, language_code, update_type, update_data, n
         end
         
         this.source = function(self)
-            return update_type, update_data
+            return update_data, update_type
         end
 
         local result, err = parse_compose(chat, this, false, update_type, update_data, ...)
@@ -894,7 +894,7 @@ send_object = function(self, chat_id, language_code, update_type, update_data, n
         end
         
         chat.source = function(self)
-            return update_type, update_data
+            return update_data, update_type
         end
 
         thread.main = coroutine.create(object._main)

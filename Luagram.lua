@@ -111,7 +111,7 @@ local function telegram(self, method, data, multipart)
     end
     if self.__super._debug then
         if not multipart then
-            stdout(string.format("--> %s %s", tostring(method), tostring(body)))
+            stdout(string.format("--> %s %s", tostring(method), data and tostring(body) or "{}"))
         else
             stdout(string.format("--> %s (multipart: %s)", tostring(method), tostring(multipart)))
         end
@@ -122,7 +122,7 @@ local function telegram(self, method, data, multipart)
         headers = headers
     })
     if self.__super._debug then
-        stdout(string.format("<-- %s (status: %s)",  tostring(response), tostring(response_status)))
+        stdout(string.format("<-- %s %s (status: %s)", tostring(method), tostring(response), tostring(response_status)))
     end
     local result, err
     if tonumber(response_status) == 200 then
@@ -130,7 +130,7 @@ local function telegram(self, method, data, multipart)
         ok, result, err = pcall(self.__super._json_decoder, response)
         if ok and type(result) == "table" then
             if not result.ok then
-                return false, string.format("%s: %s", result.error_code or "?", result.description or ""), response, response_status, response_headers
+                return false, string.format("%s (%s) %s", tostring(method), result.error_code or "?", result.description or ""), response, response_status, response_headers
             end
             result = result.result
             if type(result) == "table" then
@@ -139,16 +139,16 @@ local function telegram(self, method, data, multipart)
             return result, response, response_status, response_headers
         end
     end
-    return nil, string.format("%s: %s", response_status or "?", tostring(result or err or response or "")), response, response_status, response_headers
+    return nil, string.format("%s (%s) %s", tostring(method), response_status or "?", tostring(result or err or response or "")), response, response_status, response_headers
 end
 
 local function escape_html(text)
-    return string.gsub(text, '[<>&"]', {
+    return (string.gsub(tostring(text), '[<>&"]', {
         ["<"] = "&lt;",
         [">"] = "&gt;",
         ["&"] = "&amp;",
         ['"'] = "&quot;"
-    })
+    }))
 end
 
 local function escape_path(text)
@@ -956,7 +956,7 @@ addons.compose = function(self)
                     if type(data) == "table" and data.chat_id == nil then
                         data.chat_id = _chat_id
                     end
-                    return telegram(self, key, data, multipart)
+                    return assert(telegram(self, key, data, multipart))
                 end
             end
         end
@@ -1423,7 +1423,7 @@ addons.chat = function(self)
                     if type(data) == "table" and data.chat_id == nil then
                         data.chat_id = rawget(self, "_chat_id")
                     end
-                    return telegram(self, key, data, multipart)
+                    return assert(telegram(self, key, data, multipart))
                 end
             end
         end
@@ -1713,7 +1713,7 @@ function Luagram:__index(key)
             end
         elseif not string.match(key, "^_") then
             return function(self, data, multipart)
-                return telegram(self, key, data, multipart)
+                return assert(telegram(self, key, data, multipart))
             end
         end
     end
@@ -2409,10 +2409,10 @@ local function parse_update(self, update)
                     end
                     for key, value in pairs(items) do
                         if type(value) == "table" then
-                            html[#html + 1] = string.format("<i>%s</i>:", tostring(key))
+                            html[#html + 1] = string.format("<i>%s</i>:", escape_html(key))
                             serialize(value, level + 1)
                         else
-                            html[#html + 1] = string.format("%s<i>%s</i>: %s", string.rep("  ", level), tostring(key), tostring(value))
+                            html[#html + 1] = string.format("%s<i>%s</i>: %s", string.rep("  ", level), escape_html(key), escape_html(value))
                         end
                     end
                 end

@@ -2376,7 +2376,7 @@ local function parse_update(self, update)
 
         local time = string.match(update_data.data, "^Luagram_action_%d+_%d+_(%d+)$")
         if time and (not user or tonumber(time) < user.created_at) then
-            if update_data.message and update_data.message.chat.type == "private" then
+            if update_data.from and update_data.from.is_bot ~= true and update_data.message and update_data.message.chat.type == "private" then
                 self.__super:answer_callback_query({
                     callback_query_id = update_data.id,
                     text = text(self:chat(chat_id, language_code), {"Welcome back! This message is outdated. Let's start over!"})
@@ -2581,7 +2581,7 @@ local function parse_update(self, update)
         return self
     end
 
-    if update_type == "message" and update_data.chat and update_data.chat.type == "private" then
+    if update_type == "message" and update_data.from and update_data.from.is_bot ~= true and update_data.chat and update_data.chat.type == "private" then
         if send_object(self, chat_id, language_code, update_type, update_data, "/start") == true then
             return self
         end

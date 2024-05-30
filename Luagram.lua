@@ -259,7 +259,7 @@ local function parse_compose(chat, compose, only_content, ...)
     local row = {}
     local data = {}
 
-    local media, media_type, media_spoiler
+    local media, media_type, media_spoiler, media_above
 
     local multipart = false
 
@@ -413,7 +413,11 @@ local function parse_compose(chat, compose, only_content, ...)
                 end
                 open_tags.quote = true
                 open_tags[#open_tags + 1] = "</blockquote>"
-                texts[#texts + 1] = "<blockquote>"
+                if item.expandable then
+                    texts[#texts + 1] = "<blockquote expandable>"
+                else
+                    texts[#texts + 1] = "<blockquote>"
+                end
                 if item.value then
                     texts[#texts + 1] = escape_html(text(chat, item.value))
                     if not open_tags.open then
@@ -489,6 +493,7 @@ local function parse_compose(chat, compose, only_content, ...)
             elseif not only_content and item._type == "media" then
                 media = item.media
                 media_spoiler = item.spoiler
+                media_above = item.above
             elseif not only_content and  item._type == "data" then
                 data[item.key] = item.value
 
@@ -725,6 +730,7 @@ local function parse_compose(chat, compose, only_content, ...)
             if media then
                 output.animation = media
                 output.has_spoiler = media_spoiler
+                output.show_caption_above_media = media_above
                 if multipart then
                     compose._multipart = "animation"
                 end
@@ -735,6 +741,7 @@ local function parse_compose(chat, compose, only_content, ...)
             if media then
                 output.photo = media
                 output.has_spoiler = media_spoiler
+                output.show_caption_above_media = media_above
                 if multipart then
                     compose._multipart = "photo"
                 end
@@ -1003,7 +1010,7 @@ addons.compose = function(self)
         end
     end
 
-    local function simple(_type, arg1, ...) -- luacheck: ignore
+    local function single(_type, arg1, ...) -- luacheck: ignore
         local filter = list(...)
         return function(self, ...)
             local index, value1 = ...
@@ -1022,7 +1029,7 @@ addons.compose = function(self)
         end
     end
 
-    local function multiple(_type, arg1, arg2, ...) -- luacheck: ignore
+    local function double(_type, arg1, arg2, ...) -- luacheck: ignore
         local filter = list(...)
         return function(self, ...)
             local index, value1, value2 = ...
@@ -1042,14 +1049,37 @@ addons.compose = function(self)
             return self
         end
     end
+    
+    local function triple(_type, arg1, arg2, arg3, ...) -- luacheck: ignore
+        local filter = list(...)
+        return function(self, ...)
+            local index, value1, value2, value3 = ...
+            local _index
+            if type(index) == "number" and select("#", ...) > 1 then
+                _index = index
+            else
+                value3 = value2
+                value2 = value1
+                value1 = index
+            end
+            insert(self, _index, {
+                _type = _type,
+                [arg1] = value1,
+                [arg2] = value2,
+                [arg3] = value3,
+                filter = filters(value1, _type, unlist(filter))
+            })
+            return self
+        end
+    end
 
     local items = {
-        "text", "bold", "italic", "underline", "spoiler", "strike", "mono", "pre", "html", "quote", "close"
+        "text", "bold", "italic", "underline", "spoiler", "strike", "mono", "pre", "html", "close"
     }
 
     for index = 1, #items do
         local _type = items[index]
-        compose[_type] = simple(_type, "value", --[[filters:]] "content")
+        compose[_type] = single(_type, "value", --[[filters:]] "content")
     end
 
     compose.run = function(self, ...)
@@ -1124,7 +1154,7 @@ addons.compose = function(self)
         return self
     end
 
-    compose.emoji = multiple("emoji", "placeholder", --[[filters:]] "emoji", "content")
+    compose.emoji = double("emoji", "placeholder", --[[filters:]] "emoji", "content")
 
     compose.code = function(self, ...)
         local index, language, code = ...
@@ -1164,15 +1194,17 @@ addons.compose = function(self)
         return self
     end
 
-    compose.media = multiple("media", "media", "spoiler", --[[filters:]] "misc", "media")
+    compose.media = triple("media", "media", "spoiler", "above", --[[filters:]] "misc", "media")
 
-    compose.title = simple("title", "title", --[[filters:]] "content", "transaction")
+    compose.quote = double("quote", "value", "expandable", --[[filters:]] "content")
 
-    compose.description = simple("description", "description", --[[filters:]] "content", "transaction")
+    compose.title = single("title", "title", --[[filters:]] "content", "transaction")
 
-    compose.price = multiple("price", "label", "amount", --[[filters:]] "content", "transaction")
+    compose.description = single("description", "description", --[[filters:]] "content", "transaction")
 
-    compose.data = multiple("data", "key", "value", --[[filters:]] "misc")
+    compose.price = double("price", "label", "amount", --[[filters:]] "content", "transaction")
+
+    compose.data = double("data", "key", "value", --[[filters:]] "misc")
 
     compose.button = function(self, ...)
         local index, label, event, arg = ...

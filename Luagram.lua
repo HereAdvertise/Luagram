@@ -152,9 +152,9 @@ local function escape_html(text)
 end
 
 local function escape_path(text)
-    return string.gsub(text, "%W", function(char)
+    return (string.gsub(text, "%W", function(char)
         return string.format("%%%02X", string.byte(char))
-    end)
+    end))
 end
 
 local function locale(self, value, number)
@@ -757,7 +757,7 @@ local function parse_compose(chat, compose, only_content, ...)
 
     if #buttons > 0 then
         output.reply_markup = {
-            inline_keyboard	= buttons
+            inline_keyboard = buttons
         }
     end
 
@@ -2368,11 +2368,19 @@ local function parse_update(self, update)
 
         local time = string.match(update_data.data, "^Luagram_action_%d+_%d+_(%d+)$")
         if time and (not user or tonumber(time) < user.created_at) then
-            self.__super:answer_callback_query({
-                callback_query_id = update_data.id,
-                text = text(self:chat(chat_id, language_code), {"Welcome back! This message is outdated. Let's start over!"})
-            })
-            if send_object(self, chat_id, language_code, "/start") == true then
+            if update_data.message and update_data.message.chat.type == "private" then
+                self.__super:answer_callback_query({
+                    callback_query_id = update_data.id,
+                    text = text(self:chat(chat_id, language_code), {"Welcome back! This message is outdated. Let's start over!"})
+                })
+                if send_object(self, chat_id, language_code, "/start") == true then
+                    return self
+                end
+            else
+                self.__super:answer_callback_query({
+                    callback_query_id = update_data.id,
+                    text = text(self:chat(chat_id, language_code), {"Welcome back! This message is outdated."})
+                })
                 return self
             end
         end

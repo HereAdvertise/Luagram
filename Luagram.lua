@@ -1572,10 +1572,14 @@ function Luagram.new(options)
     self._api = options.api
     self._headers = options.headers
     
-    if options.transactions then
+    if type(options.transactions) == "table" then
         self._transaction_report_to = assert(options.transactions.report_to, "required option: transactions.report_to")
         self._transaction_currency = assert(options.transactions.currency, "required option: transactions.currency")
         self._transaction_provider_token = assert(options.transactions.provider_token, "required option: transactions.provider_token")
+    elseif type(options.transactions) == "string" or type(options.transactions) == "number" then
+        self._transaction_report_to = options.transactions
+        self._transaction_currency = "XTR"
+        self._transaction_provider_token = ""
     end
 
     self._http_provider = options.http_provider

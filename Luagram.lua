@@ -37,6 +37,13 @@ local function request(self, url, options)
     return response, response_status, response_headers or headers
 end
 
+local function assert_level(level, ...)
+    if not select(1, ...) then
+        return error(select(2, ...) or "assertion failed!", level)
+    end
+    return ...
+end
+
 local function generate_boundary()
     local alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
     math.randomseed(os.time())
@@ -964,7 +971,7 @@ addons.compose = function(self)
                     if type(data) == "table" and data.chat_id == nil then
                         data.chat_id = _chat_id
                     end
-                    return assert(telegram(self, key, data, multipart))
+                    return assert_level(2, telegram(self, key, data, multipart))
                 end
             end
         end
@@ -1431,7 +1438,7 @@ addons.chat = function(self)
                     if type(data) == "table" and data.chat_id == nil then
                         data.chat_id = rawget(self, "_chat_id")
                     end
-                    return assert(telegram(self, key, data, multipart))
+                    return assert_level(2, telegram(self, key, data, multipart))
                 end
             end
         end
@@ -1733,7 +1740,7 @@ function Luagram:__index(key)
             end
         elseif not string.match(key, "^_") then
             return function(self, data, multipart)
-                return assert(telegram(self, key, data, multipart))
+                return assert_level(2, telegram(self, key, data, multipart))
             end
         end
     end

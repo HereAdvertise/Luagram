@@ -204,7 +204,7 @@ local function format(values)
     local ok
     ok, result = pcall(string.format, result, unpack(values, 2))
     if not ok then
-        error(string.format("invalid string found: %s", result))
+        error(string.format("format error (%q): %s", values[1], result))
     end
     local number
     for key, value in pairs(values) do

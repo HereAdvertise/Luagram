@@ -1946,8 +1946,11 @@ local function callback_query(self, chat_id, language_code, update_data)
             return
         end
 
+        local args
+
         if response == true then
             this = self.compose.clone(action.compose._origin)
+            args = action.compose._origin._args
         elseif response == false then
             this:remove({keyboard = true})
         elseif type(response) == "string" then
@@ -2002,7 +2005,7 @@ local function callback_query(self, chat_id, language_code, update_data)
             end
         end
 
-        local result, err = parse_compose(chat, this:clone(), false, "callback_query", update_data, unlist(select("#", ...) > 0 and list(...) or list()))
+        local result, err = parse_compose(chat, this:clone(), false, "callback_query", update_data, unlist(select("#", ...) > 0 and list(...) or args or list()))
         if result == nil then
             action.compose._catch(string.format("parser error: %s", err))
         end

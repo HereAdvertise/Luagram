@@ -2703,8 +2703,8 @@ function Luagram:start()
                         return
                     end
                     self._get_updates.offset = offset
-                    local result, err = self.__super:get_updates(self._get_updates)
-                    if result then
+                    local ok, result = pcall(self.__super.get_updates, self.__super, self._get_updates)
+                    if ok and result then
                         for index = 1, #result do
                             local update = result[index]
                             update._response = result._response
@@ -2712,7 +2712,7 @@ function Luagram:start()
                             self:update(update)
                         end
                     else
-                        self._catch(tostring(err))
+                        self._catch(tostring(result))
                     end
                     collectgarbage()
                     -- _G.unix.nanosleep(1)
@@ -2739,8 +2739,8 @@ function Luagram:start()
                     return
                 end
                 self._get_updates.offset = offset
-                local result, err = self.__super:get_updates(self._get_updates)
-                if result then
+                local ok, result = pcall(self.__super.get_updates, self.__super, self._get_updates)
+                if ok and result then
                     for index = 1, #result do
                         local update = result[index]
                         update._response = result._response
@@ -2748,7 +2748,7 @@ function Luagram:start()
                         self:update(update)
                     end
                 else
-                    self._catch(err)
+                    self._catch(result)
                 end
                 collectgarbage()
                 return polling() -- tail call

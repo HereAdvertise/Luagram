@@ -138,17 +138,17 @@ local function telegram(self, method, data, multipart, tries)
         if type(result) == "table" then
             result._response = response
         end
-        self:__sleep_fn(0.1)
+        self._sleep_fn(0.1)
         return result, response, response_status, response_headers
     elseif ok and type(result) == "table" then
         if tries == 0 and type(result.parameters) == "table" and type(result.parameters.retry_after) == "number" then
-            self:__sleep_fn(result.parameters.retry_after)
+            self._sleep_fn(result.parameters.retry_after)
             return telegram(self, method, data, multipart, tries + 1)
         end
-        self:__sleep_fn(0.1)
+        sel._sleep_fn(0.1)
         return false, string.format("%s (%s) %s", tostring(method), result.error_code or "?", result.description or ""), response, response_status, response_headers
     end
-    self:__sleep_fn(1)
+    self._sleep_fn(1)
     return nil, string.format("%s (%s) %s", tostring(method), response_status or "?", tostring(result or err or response or "")), response, response_status, response_headers
 end
 

@@ -135,17 +135,20 @@ local function telegram(self, method, data, multipart, tries)
     local ok, result, err = pcall(self.__super._json_decoder, response)
     if ok and type(result) == "table" and result.ok then
         result = result.result
+        if type(result.parameters) == "table" and result.parameters.migrate_to_chat_id then
+            stderr(string.format("chat_id migrated to %s", tostring(result.parameters.migrate_to_chat_id)))
+        end
         if type(result) == "table" then
             result._response = response
         end
-        self._sleep_fn(0.1)
+        self._sleep_fn(.05)
         return result, response, response_status, response_headers
     elseif ok and type(result) == "table" then
         if tries == 0 and type(result.parameters) == "table" and type(result.parameters.retry_after) == "number" then
             self._sleep_fn(result.parameters.retry_after)
             return telegram(self, method, data, multipart, tries + 1)
         end
-        self._sleep_fn(0.1)
+        self._sleep_fn(.05)
         return false, string.format("%s (%s) %s", tostring(method), result.error_code or "?", result.description or ""), response, response_status, response_headers
     end
     if tries == 0 then

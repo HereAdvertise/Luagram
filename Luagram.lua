@@ -134,10 +134,10 @@ local function telegram(self, method, data, multipart, tries)
     end
     local ok, result, err = pcall(self.__super._json_decoder, response)
     if ok and type(result) == "table" and result.ok then
-        result = result.result
         if type(result.parameters) == "table" and result.parameters.migrate_to_chat_id then
             stderr(string.format("chat_id migrated to %s", tostring(result.parameters.migrate_to_chat_id)))
         end
+        result = result.result
         if type(result) == "table" then
             result._response = response
         end

@@ -148,7 +148,10 @@ local function telegram(self, method, data, multipart, tries)
         sel._sleep_fn(0.1)
         return false, string.format("%s (%s) %s", tostring(method), result.error_code or "?", result.description or ""), response, response_status, response_headers
     end
-    self._sleep_fn(1)
+    if tries == 0 then
+        self._sleep_fn(1)
+        return telegram(self, method, data, multipart, tries + 1)
+    end
     return nil, string.format("%s (%s) %s", tostring(method), response_status or "?", tostring(result or err or response or "")), response, response_status, response_headers
 end
 

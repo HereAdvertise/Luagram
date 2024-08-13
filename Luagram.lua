@@ -145,7 +145,7 @@ local function telegram(self, method, data, multipart, tries)
             self._sleep_fn(result.parameters.retry_after)
             return telegram(self, method, data, multipart, tries + 1)
         end
-        sel._sleep_fn(0.1)
+        self._sleep_fn(0.1)
         return false, string.format("%s (%s) %s", tostring(method), result.error_code or "?", result.description or ""), response, response_status, response_headers
     end
     if tries == 0 then

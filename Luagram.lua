@@ -63,8 +63,9 @@ local mimetypes = {
     webp = "image/webp",
 }
 
-local function telegram(self, method, data, multipart)
+local function telegram(self, method, data, multipart, tries)
     local api = self.__super._api or "https://api.telegram.org/bot%s/%s"
+    tries = tries or 0
     api = string.format(api, self.__super._token, string.gsub(method, "%W", ""))
     local headers, body
     if multipart then
@@ -131,21 +132,23 @@ local function telegram(self, method, data, multipart)
     if self.__super._debug then
         stdout(string.format("<-- %s %s (status: %s)", tostring(method), tostring(response), tostring(response_status)))
     end
-    local result, err
-    if tonumber(response_status) == 200 then
-        local ok
-        ok, result, err = pcall(self.__super._json_decoder, response)
-        if ok and type(result) == "table" then
-            if not result.ok then
-                return false, string.format("%s (%s) %s", tostring(method), result.error_code or "?", result.description or ""), response, response_status, response_headers
-            end
-            result = result.result
-            if type(result) == "table" then
-                result._response = response
-            end
-            return result, response, response_status, response_headers
+    local ok, result, err = pcall(self.__super._json_decoder, response)
+    if ok and type(result) == "table" and result.ok then
+        result = result.result
+        if type(result) == "table" then
+            result._response = response
         end
+        self:__sleep_fn(0.1)
+        return result, response, response_status, response_headers
+    elseif ok and type(result) == "table" then
+        if tries == 0 and type(result.parameters) == "table" and type(result.parameters.retry_after) == "number" then
+            self:__sleep_fn(result.parameters.retry_after)
+            return telegram(self, method, data, multipart, tries + 1)
+        end
+        self:__sleep_fn(0.1)
+        return false, string.format("%s (%s) %s", tostring(method), result.error_code or "?", result.description or ""), response, response_status, response_headers
     end
+    self:__sleep_fn(1)
     return nil, string.format("%s (%s) %s", tostring(method), response_status or "?", tostring(result or err or response or "")), response, response_status, response_headers
 end
 
@@ -1585,6 +1588,7 @@ function Luagram.new(options)
     self._http_provider = options.http_provider
     self._json_encoder = options.json_encoder
     self._json_decoder = options.json_decoder
+    self._sleep_fn = options._sleep_fn
 
     self._debug = options.debug
 
@@ -1680,6 +1684,19 @@ function Luagram.new(options)
             else
                 local json = require("json")
                 self._json_decoder = json.decode
+            end
+        end
+    end
+
+    if not self._sleep_fn then
+        if _G.GetRedbeanVersion then
+            self._sleep_fn = _G.Sleep
+        elseif _G.ngx then
+            self._sleep_fn = _G.ngx.sleep
+        else
+            local socket = require("socket")
+            self._sleep_fn = function(secs)
+                socket.select(nil, nil, secs)
             end
         end
     end

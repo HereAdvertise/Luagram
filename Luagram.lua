@@ -849,10 +849,7 @@ send_object = function(self, chat_id, language_code, update_type, update_data, n
         if result then
 
             for index = 1, #object._predispatch do
-                local parsed_result = object._predispatch[index](result)
-                if type(parsed_result) == "table" then
-                    result = parsed_result
-                end
+                object._predispatch[index](result._output, result._multipart)
             end
 
             local ok, message

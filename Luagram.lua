@@ -2236,11 +2236,12 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
 
     local transaction = user.interactions[payload]
 
-    local catch = transaction.compose._catch
-
+    print("%%%%%%%%%%%%%"..EncodeJson(user))
     if not transaction then
         return false
     end
+
+    local catch = transaction.compose._catch
 
     local this = self:chat(chat_id, language_code)
 

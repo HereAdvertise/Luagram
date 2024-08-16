@@ -661,6 +661,8 @@ local function parse_compose(chat, compose, only_content, update_type, update_da
                 method = "animation"
             elseif file_path:match("photos") then
                 method = "photo"
+            elseif file_path:match("videos") then
+                method = "video"
             else
                 error(string.format("unknown file type: %s", file_path))
             end
@@ -691,6 +693,8 @@ local function parse_compose(chat, compose, only_content, update_type, update_da
                     method = "animation"
                 elseif content_type == "image/png" or content_type == "image/jpg" or content_type == "image/jpeg" then
                     method = "photo"
+                elseif content_type == "video/mp4" then
+                    method = "video"
                 else
                     error(string.format("unknown file content type (%s): %s", media, content_type))
                 end
@@ -709,6 +713,8 @@ local function parse_compose(chat, compose, only_content, update_type, update_da
                 method = "animation"
             elseif extension == "png" or extension == "jpg" or extension == "jpeg" or extension == "webp" then
                 method = "photo"
+            elseif extension == "mp4" then
+                method = "video"
             else
                 error(string.format("unknown media type: %s", media))
             end
@@ -760,6 +766,17 @@ local function parse_compose(chat, compose, only_content, update_type, update_da
                 output.show_caption_above_media = media_above
                 if multipart then
                     compose._multipart = "photo"
+                end
+            end
+            output.caption = table.concat(texts)
+        elseif method == "video" then
+
+            if media then
+                output.video = media
+                output.has_spoiler = media_spoiler
+                output.show_caption_above_media = media_above
+                if multipart then
+                    compose._multipart = "video"
                 end
             end
             output.caption = table.concat(texts)
@@ -858,6 +875,8 @@ send_object = function(self, chat_id, language_code, update_type, update_data, n
                 ok, message = self.__super:send_animation(result._output, result._multipart)
             elseif result._method == "photo" then
                 ok, message = self.__super:send_photo(result._output, result._multipart)
+            elseif result._method == "video" then
+                ok, message = self.__super:send_video(result._output, result._multipart)
             elseif result._method == "message" then
                 ok, message = self.__super:send_message(result._output, result._multipart)
             elseif result._method == "invoice" then
@@ -2049,6 +2068,8 @@ local function callback_query(self, chat_id, language_code, update_data)
                 ok, message = self.__super:send_animation(result._output, result._multipart)
             elseif result._method == "photo" then
                 ok, message = self.__super:send_photo(result._output, result._multipart)
+            elseif result._method == "video" then
+                ok, message = self.__super:send_video(result._output, result._multipart)
             elseif result._method == "message" then
                 ok, message = self.__super:send_message(result._output, result._multipart)
             elseif result._method == "invoice" then
@@ -2081,6 +2102,8 @@ local function callback_query(self, chat_id, language_code, update_data)
                 ok, message = self.__super:send_animation(result._output, result._multipart)
             elseif result._method == "photo" then
                 ok, message = self.__super:send_photo(result._output, result._multipart)
+            elseif result._method == "video" then
+                ok, message = self.__super:send_video(result._output, result._multipart)
             elseif result._method == "message" then
                 ok, message = self.__super:send_message(result._output, result._multipart)
             elseif result._method == "invoice" then

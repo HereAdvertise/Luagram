@@ -2236,7 +2236,6 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
 
     local transaction = user.interactions[payload]
 
-    print("%%%%%%%%%%%%%"..EncodeJson(user))
     if not transaction then
         return false
     end

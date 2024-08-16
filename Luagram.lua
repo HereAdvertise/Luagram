@@ -261,7 +261,7 @@ local function parse_compose(chat, compose, only_content, update_type, update_da
 
     local users = chat.__super._users
 
-    local user = users:get(chat._chat_id)
+    local user = users:get(tostring(chat._chat_id))
 
     if not only_content and not user then
         compose:catch("user not found")
@@ -811,14 +811,14 @@ send_object = function(self, chat_id, language_code, update_type, update_data, n
     local users = self.__super._users
     local objects = self.__super._objects
 
-    local user = users:get(chat_id)
+    local user = users:get(tostring(chat_id))
 
     if not user then
-        users:set(chat_id, {
+        users:set(tostring(chat_id), {
             created_at = os.time(),
             interactions = {}
         })
-        user = users:get(chat_id)
+        user = users:get(tostring(chat_id))
     end
     user.updated_at = os.time()
 
@@ -918,7 +918,7 @@ send_object = function(self, chat_id, language_code, update_type, update_data, n
         end
 
         chat.cancel = function(self)
-            local user = users:get(self._chat_id)
+            local user = users:get(tostring(self._chat_id))
             if user then
                 user.thread = nil
             end
@@ -1834,7 +1834,7 @@ local function callback_query(self, chat_id, language_code, update_data)
         return false
     end
 
-    local user = self._users:get(chat_id)
+    local user = self._users:get(tostring(chat_id))
 
     if not user then
         return false
@@ -2149,7 +2149,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
         return false
     end
 
-    local user = self._users:get(chat_id)
+    local user = self._users:get(tostring(chat_id))
 
     if not user then
         return false
@@ -2251,7 +2251,7 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
         return false
     end
 
-    local user = self._users:get(chat_id)
+    local user = self._users:get(tostring(chat_id))
 
     if not user then
         return false
@@ -2332,7 +2332,7 @@ local function successful_payment(self, chat_id, language_code, update_data)
         return false, "Transaction identifier not found in this session. Please manually contact the payer to resolve the outcome of this payment."
     end
 
-    local user = self._users:get(chat_id)
+    local user = self._users:get(tostring(chat_id))
 
     if not user then
         return false, "Transaction user not found in this session. Please manually contact the payer to resolve the outcome of this payment."
@@ -2390,7 +2390,7 @@ local function parse_update(self, update)
 
     local chat_id, language_code = chat_id(update_data, update_type)
     
-    local user = self._users:get(chat_id)
+    local user = self._users:get(tostring(chat_id))
 
     if update_type == "callback_query" then
 
@@ -2534,11 +2534,11 @@ local function parse_update(self, update)
     end
 
     if not user then
-        self._users:set(chat_id, {
+        self._users:set(tostring(chat_id), {
             created_at = os.time(),
             interactions = {}
         })
-        user = self._users:get(chat_id)
+        user = self._users:get(tostring(chat_id))
     end
     user.updated_at = os.time()
 

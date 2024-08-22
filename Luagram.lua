@@ -314,39 +314,51 @@ local function parse_compose(chat, compose, only_content, update_type, update_da
     end
 
     local index = 1
-
+    
+    -- runtime
     while index <= #compose do
         local item = compose[index]
-        if type(item) == "table" and item._type and item._indexed ~= compose._id and item._removed ~= true then
+        if type(item) == "table" and item._type == "run" and item._indexed ~= compose._id and item._removed ~= true then
+
             item._indexed = compose._id
 
-            -- runtime
-            if item._type == "run" then
+            compose._runtime = index + 1
+            local result, args = (function(ok, ...)
+                if not ok then
+                    compose._catch(...)
+                    return
+                end
+                return ..., list(select(2, ...))
+            end)(pcall(item.run, compose, unlist(item.args["#"] > 0 and item.args or select("#", ...) > 0 and list(...) or compose._args)))
+            compose._runtime = nil
 
-                compose._runtime = index + 1
-                local result, args = (function(ok, ...)
-                    if not ok then
-                        compose._catch(...)
-                        return
-                    end
-                    return ..., list(select(2, ...))
-                end)(pcall(item.run, compose, unlist(item.args["#"] > 0 and item.args or select("#", ...) > 0 and list(...) or compose._args)))
-                compose._runtime = nil
-
-                if result == false then
-                    return false
-                elseif result then
-                    if only_content then
-                        return false
-                    end
-
-                    send_object(compose, chat._chat_id, chat._language_code, update_type, update_data, result, unlist(args["#"] > 0 and args or (select("#", ...) > 0 and list(...) or list())))
-
+            if result == false then
+                return false
+            elseif result then
+                if only_content then
                     return false
                 end
 
+                send_object(compose, chat._chat_id, chat._language_code, update_type, update_data, result, unlist(args["#"] > 0 and args or (select("#", ...) > 0 and list(...) or list())))
+
+                return false
+            end
+            
+        end
+        index = index + 1
+    end
+
+    index = 1
+
+    while index <= #compose do
+
+        local item = compose[index]
+        if type(item) == "table" and item._type and item._indexed ~= compose._id and item._removed ~= true then
+
+            item._indexed = compose._id
+
             -- content
-            elseif item._type == "text" then
+            if item._type == "text" then
                 texts[#texts + 1] = escape_html(text(chat, item.value))
             elseif item._type == "bold" then
                 if open_tags.bold then

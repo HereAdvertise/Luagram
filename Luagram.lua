@@ -318,11 +318,15 @@ local function parse_compose(chat, compose, only_content, update_type, update_da
     -- runtime
     while index <= #compose do
         local item = compose[index]
+
         if type(item) == "table" and item._type == "run" and item._indexed ~= compose._id and item._removed ~= true then
 
             item._indexed = compose._id
 
-            compose._runtime = index + 1
+            local position = item._position
+            if not position then
+                compose._position = index + 1
+            end
             local result, args = (function(ok, ...)
                 if not ok then
                     compose._catch(...)
@@ -330,7 +334,7 @@ local function parse_compose(chat, compose, only_content, update_type, update_da
                 end
                 return ..., list(select(2, ...))
             end)(pcall(item.run, compose, unlist(item.args["#"] > 0 and item.args or select("#", ...) > 0 and list(...) or compose._args)))
-            compose._runtime = nil
+            compose._position = position
 
             if result == false then
                 return false
@@ -998,6 +1002,7 @@ addons.compose = function(self)
         self._predispatch = {}
         self._args = list(...)
         self._parse_mode = "HTML"
+        self._position = false
         self:catch(catch_error)
     end, function(self, key)
         local value = rawget(getmetatable(self), key)
@@ -1018,6 +1023,8 @@ addons.compose = function(self)
             return self:run(value)
         elseif type(value) == "string" then
             return self:text(value)
+        elseif type(value) == "number" then
+            return self:position(value)
         else
             error(string.format("compose: invalid call %q", tostring(value)))
         end
@@ -1048,79 +1055,34 @@ addons.compose = function(self)
         return clone
     end
 
-    local function insert(self, index, data)
-        if not index then
-            if self._runtime then
-                data._runtime = true
-                table.insert(self, self._runtime, data)
-                self._runtime = self._runtime + 1
-            else
-                table.insert(self, data)
-            end
+    local function insert(self, data)
+        if type(self._position) == "number" then
+            table.insert(self, self._position, data)
+            self._position = self._position + 1
+        elseif type(data._position) == "number" then
+            table.insert(self, data._position, data)
+            data._position = data._position + 1
         else
-            table.insert(self, index, data)
-        end
-    end
-
-    local function single(_type, arg1, ...) -- luacheck: ignore
-        local filter = list(...)
-        return function(self, ...)
-            local index, value1 = ...
-            local _index
-            if type(index) == "number" and select("#", ...) > 1 then
-                _index = index
-            else
-                value1 = index
-            end
-            insert(self, _index, {
-                _type = _type,
-                [arg1] = value1,
-                filter = filters(value1, _type, unlist(filter))
-            })
-            return self
-        end
-    end
-
-    local function double(_type, arg1, arg2, ...) -- luacheck: ignore
-        local filter = list(...)
-        return function(self, ...)
-            local index, value1, value2 = ...
-            local _index
-            if type(index) == "number" and select("#", ...) > 1 then
-                _index = index
-            else
-                value2 = value1
-                value1 = index
-            end
-            insert(self, _index, {
-                _type = _type,
-                [arg1] = value1,
-                [arg2] = value2,
-                filter = filters(value1, _type, unlist(filter))
-            })
-            return self
+            table.insert(self, data)
         end
     end
     
-    local function triple(_type, arg1, arg2, arg3, ...) -- luacheck: ignore
-        local filter = list(...)
-        return function(self, ...)
-            local index, value1, value2, value3 = ...
-            local _index
-            if type(index) == "number" and select("#", ...) > 1 then
-                _index = index
-            else
-                value3 = value2
-                value2 = value1
-                value1 = index
-            end
-            insert(self, _index, {
+    local function item(_type, arg1, arg2, arg3, filter) -- luacheck: ignore
+        return function(self, value1, value2, value3)
+            local data = {
                 _type = _type,
-                [arg1] = value1,
-                [arg2] = value2,
-                [arg3] = value3,
                 filter = filters(value1, _type, unlist(filter))
-            })
+            }
+            if arg1 then
+               data[arg1] = value1
+            end
+            if arg2 then
+               data[arg2] = value2 
+            end
+            if arg3 then
+               data[arg3] = value3
+            end
+            insert(self, data)
             return self
         end
     end
@@ -1131,27 +1093,20 @@ addons.compose = function(self)
 
     for index = 1, #items do
         local _type = items[index]
-        compose[_type] = single(_type, "value", --[[filters:]] "content")
+        compose[_type] = item(_type, "value", nil, nil, list("content"))
     end
 
-    compose.run = function(self, ...)
-        local index, run = ...
-        local _index, args
-        if type(index) == "number" and select("#", ...) > 1 then
-            _index = index
-            args = list(select(3, ...))
-        else
-            run = index
-            args = list(select(2, ...))
-        end
+    compose.run = function(self, run, ...)
+        local args = list(...)
         if type(run) ~= "function" then
             local value = run
             run = function(...)
                 return value, ...
             end
         end
-        insert(self, _index, {
+        insert(self, {
             _type = "run",
+            _position = self._position,
             run = run,
             args = args,
             filter = filters(nil, "run", "runtime")
@@ -1159,19 +1114,11 @@ addons.compose = function(self)
         return self
     end
 
-    compose.link = function(self, ...)
-        local index, label, url = ...
-        local _index
-        if type(index) == "number" and select("#", ...) > 1 then
-            _index = index
-        else
-            url = label
-            label = index
-        end
+    compose.link = function(self, label, url)
         if url == nil then
             url = label
         end
-        insert(self, _index, {
+        insert(self, {
             _type = "link",
             url = url,
             label = label,
@@ -1180,15 +1127,7 @@ addons.compose = function(self)
         return self
     end
 
-    compose.mention = function(self, ...)
-        local index, name, user = ...
-        local _index
-        if type(index) == "number" and select("#", ...) > 1 then
-            _index = index
-        else
-            user = name
-            name = index
-        end
+    compose.mention = function(self, name, user)
         if tonumber(user) then
             user = string.format("tg://user?id=%s", user)
         else
@@ -1197,7 +1136,7 @@ addons.compose = function(self)
             end
             user = string.format("https://t.me/%s", user)
         end
-        insert(self, _index, {
+        insert(self, {
             _type = "mention",
             user = user,
             name = name,
@@ -1206,22 +1145,14 @@ addons.compose = function(self)
         return self
     end
 
-    compose.emoji = double("emoji", "placeholder", --[[filters:]] "emoji", "content")
+    compose.emoji = item("emoji", "placeholder", "emoji", nil, list("emoji", "content"))
 
-    compose.code = function(self, ...)
-        local index, language, code = ...
-        local _index
-        if type(index) == "number" and select("#", ...) > 1 then
-            _index = index
-        else
-            code = language
-            language = index
-        end
+    compose.code = function(self, language, code)
         if code == nil then
             code = language
             language = nil
         end
-        insert(self, _index, {
+        insert(self, {
             _type = "code",
             code = code,
             language = language,
@@ -1230,15 +1161,8 @@ addons.compose = function(self)
         return self
     end
 
-    compose.line = function(self, ...)
-        local index, line = ...
-        local _index
-        if type(index) == "number" then
-            _index = index
-        else
-            line = index
-        end
-        insert(self, _index, {
+    compose.line = function(self, line)
+        insert(self, {
             _type = "line",
             value = line,
             filter = filters(nil, "line", "content")
@@ -1246,35 +1170,26 @@ addons.compose = function(self)
         return self
     end
 
-    compose.media = triple("media", "media", "spoiler", "above", --[[filters:]] "misc", "media")
+    compose.media = item("media", "media", "spoiler", "above", list("misc", "media"))
 
-    compose.quote = double("quote", "value", "expandable", --[[filters:]] "content")
+    compose.quote = item("quote", "value", "expandable", nil, list("content"))
 
-    compose.title = single("title", "title", --[[filters:]] "content", "transaction")
+    compose.title = item("title", "title", nil, nil, list("content", "transaction"))
 
-    compose.description = single("description", "description", --[[filters:]] "content", "transaction")
+    compose.description = item("description", "description", nil, nil, list("content", "transaction"))
 
-    compose.price = double("price", "label", "amount", --[[filters:]] "content", "transaction")
+    compose.price = item("price", "label", "amount", nil, list("content", "transaction"))
 
-    compose.data = double("data", "key", "value", --[[filters:]] "misc")
+    compose.data = item("data", "key", "value", nil, list("misc"))
 
-    compose.button = function(self, ...)
-        local index, label, event, arg = ...
-        local _index
-        if type(index) == "number" and select("#", ...) > 1 then
-            _index = index
-        else
-            arg = event
-            event = label
-            label = index
-        end
+    compose.button = function(self, label, event, arg)
         if #event > 15 or string.match(event, "%W") then
             error(string.format("invalid event name: %s", event))
         end
         if arg and #tostring(arg) > 20 then
             error(string.format("invalid argument: very large value"))
         end
-        insert(self, _index, {
+        insert(self, {
             _type = "button",
             label = label,
             event = event,
@@ -1284,19 +1199,9 @@ addons.compose = function(self)
         return self
     end
 
-    compose.action = function(self, ...)
-        local index, label, action = ...
-        local args
-        local _index
-        if type(index) == "number" and select("#", ...) > 1 then
-            _index = index
-            args = list(select(4, ...))
-        else
-            action = label
-            label = index
-            args = list(select(3, ...))
-        end
-        insert(self, _index, {
+    compose.action = function(self, label, action, ...)
+        local args = list(...)
+        insert(self, {
             _type = "action",
             id = id(self),
             label = label,
@@ -1307,17 +1212,8 @@ addons.compose = function(self)
         return self
     end
 
-    compose.location = function(self, ...)
-        local index, label, location, params = ...
-        local _index
-        if type(index) == "number" and select("#", ...) > 1 then
-            _index = index
-        else
-            params = location
-            location = label
-            label = index
-        end
-        insert(self, _index, {
+    compose.location = function(self, label, location, params)
+        insert(self, {
             _type = "location",
             label = label,
             location = location,
@@ -1328,31 +1224,16 @@ addons.compose = function(self)
     end
 
     compose.transaction = function(self, ...)
-        local index, label, transaction = ...
+        local label, transaction = ...
         local args
-        local _index
-        if type(index) == "number" and select("#", ...) > 1 then
-            _index = index
-        else
-            transaction = label
-            label = index
-        end
         if type(label) == "function" then
             transaction = label
             label = false
-            if _index then
-                args = list(select(3, ...))
-            else
-                args = list(select(2, ...))
-            end
+            args = list(select(2, ...))
         else
-            if _index then
-                args = list(select(4, ...))
-            else
-                args = list(select(3, ...))
-            end
+            args = list(select(3, ...))
         end
-        insert(self, _index, {
+        insert(self, {
             _type = "transaction",
             id = id(self),
             label = label,
@@ -1363,13 +1244,8 @@ addons.compose = function(self)
         return self
     end
 
-    compose.row = function(self, ...)
-        local index = ...
-        local _index
-        if type(index) == "number" then
-            _index = index
-        end
-        insert(self, _index, {
+    compose.row = function(self)
+        insert(self, {
             _type = "row",
             filter = filters(nil, "row", "keyboard")
         })
@@ -1408,6 +1284,23 @@ addons.compose = function(self)
             catch(string.format("%s: %s", self._name, err))
         end
         return self
+    end
+    
+    compose.position = function(self, position)
+        if type(position) == "number" and position >= 0 then
+            self._position = position
+        else
+            self._position = false
+        end
+        return self
+    end
+    
+    compose.before = function(self)
+        return self:position(1)
+    end
+    
+    compose.after = function(self)
+        return self:position(-1)
     end
 
     return self
@@ -1462,11 +1355,12 @@ end
 
 addons.chat = function(self)
 
-    self:object("chat", function(self, chat_id, language_code)
+    self:object("chat", function(self, chat_id, language_code, chat_type)
         self._type = "chat"
         self._chat_id = chat_id
         self._parse_mode = "HTML"
         self._language_code = language_code
+        self._chat_type = chat_type
     end, function(self, key)
         local value = rawget(getmetatable(self), key)
         if value == nil and type(key) == "string" then
@@ -1514,6 +1408,10 @@ addons.chat = function(self)
 
     chat.language = function(self)
         return self._language_code
+    end
+    
+    chat.type = function(self)
+        return self._chat_type
     end
 
     return self
@@ -2375,11 +2273,11 @@ local function chat_id(update_data, update_type)
         language = update_data.from.language_code
     end
     if update_type == "callback_query" then
-        return update_data.message.chat.id, language
+        return update_data.message.chat.id, language, update_data.message.chat.type
     elseif update_type == "pre_checkout_query" or update_type == "shipping_query" then
-        return update_data.from.id, language
+        return update_data.from.id, language, update_data.chat.type
     end
-    return assert(update_data.chat.id, "chat_id not found"), language
+    return assert(update_data.chat.id, "chat_id not found"), language, update_data.chat.type
 end
 
 local function parse_update(self, update)

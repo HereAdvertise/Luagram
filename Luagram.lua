@@ -1294,14 +1294,6 @@ addons.compose = function(self)
         end
         return self
     end
-    
-    compose.before = function(self)
-        return self:position(1)
-    end
-    
-    compose.after = function(self)
-        return self:position(-1)
-    end
 
     return self
 end

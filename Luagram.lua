@@ -259,7 +259,7 @@ local send_object
 
 local function parse_compose(chat, compose, only_content, update_type, update_data, ...)
 
-    local users = chat.__super._users
+    local users = compose.__super._users
 
     local user = users:get(tostring(chat._chat_id))
 

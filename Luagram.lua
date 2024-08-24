@@ -261,7 +261,11 @@ local function parse_compose(chat, compose, only_content, update_type, update_da
 
     local users = compose.__super._users
 
-    local user = users:get(tostring(chat._chat_id))
+    local user 
+    
+    if chat then
+        user = users:get(tostring(chat._chat_id))
+    end
 
     if not only_content and not user then
         compose:catch("user not found")

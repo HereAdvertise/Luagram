@@ -39,7 +39,7 @@ end
 
 local function assert_level(level, ...)
     if not select(1, ...) then
-        return error(select(2, ...) or "assertion failed!", level)
+        return error(setmetatable({select(2, ...)}, {__tostring = function(self) return self[1] or "assertion failed!" end}), level)
     end
     return ...
 end
@@ -61,6 +61,7 @@ local mimetypes = {
     jpeg = "image/jpg",
     jpg = "image/jpg",
     webp = "image/webp",
+    mp4 = "video/mp4",
 }
 
 local function telegram(self, method, data, multipart, tries)

@@ -7,4 +7,4 @@ content = string.gsub(content, "\nlocal ([a-zA-Z][a-zA-Z0-9_]*) = require \"Luag
   modulefile:close()
   return string.format("\n----\n-- %s.lua\n----\nlocal %s = (function()\n%s\nend)()\n----\n", modulename, modulename, modulecontent)
 end)
-assert(io.open("Luagram_build.lua", "w")):write(content):close()
+assert(io.open("Luagram.lua", "w")):write(content):close()

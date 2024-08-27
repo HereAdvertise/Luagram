@@ -1418,7 +1418,7 @@ end
 -- lru.lua
 ----
 local lru = (function()
-local lru = {}
+	local lru = {}
 	lru.__index = lru
 	
 	function lru.new(size)

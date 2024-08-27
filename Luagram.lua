@@ -1478,6 +1478,8 @@ local lru = (function()
 	    self:set(key, value)
 	    return value
 	end
+
+	return lru
 end)()
 ----
 

@@ -7,6 +7,6 @@ content = string.gsub(content, "local ([a-zA-Z][a-zA-Z0-9_]*) = require \"Luagra
   local modulecontent = modulefile:read("*a")
   modulecontent = string.gsub(modulecontent, "[\r\f\n].", "%1\t")
   modulefile:close()
-  return string.format("----\n-- %s.lua\n----\nlocal %s = (function()\n%s\nend)()\n----", modulename, modulename, modulecontent)
+  return string.format("----\n-- %s.lua\n----\nlocal %s = (function()\n\t%s\nend)()\n----", modulename, modulename, modulecontent)
 end)
 assert(io.open("Luagram.lua", "w")):write(content):close()

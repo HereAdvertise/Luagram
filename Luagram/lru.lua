@@ -58,3 +58,5 @@ function lru:get(key)
     self:set(key, value)
     return value
 end
+
+return lru

@@ -1916,7 +1916,7 @@ local function callback_query(self, chat_id, language_code, update_data)
                     for _, value in pairs(action.interactions) do
                         user.interactions[value] = nil
                     end
-                    pcall(self.__super.delete_message, self.__super, {
+                    self.__super:delete_message({
                         chat_id = chat_id,
                         message_id = update_data.message.message_id
                     })
@@ -1932,7 +1932,7 @@ local function callback_query(self, chat_id, language_code, update_data)
             for _, value in pairs(action.interactions) do
                 user.interactions[value] = nil
             end
-            pcall(self.__super.delete_message, self.__super, {
+            self.__super:delete_message({
                 chat_id = chat_id,
                 message_id = update_data.message.message_id
             })
@@ -1975,7 +1975,7 @@ local function callback_query(self, chat_id, language_code, update_data)
 
         if action.compose._transaction then
 
-            pcall(self.__super.delete_message, self.__super, {
+            self.__super:delete_message({
                 chat_id = chat_id,
                 message_id = update_data.message.message_id
             })
@@ -2009,7 +2009,7 @@ local function callback_query(self, chat_id, language_code, update_data)
             result._output.message_id = update_data.message.message_id
             ok, message = self.__super:edit_message_caption(result._output)
         elseif (action.compose._method == "message" and result._method ~= "message") or (action.compose._method ~= result._method) then
-            pcall(self.__super.delete_message, self.__super, {
+            self.__super:delete_message({
                 chat_id = chat_id,
                 message_id = update_data.message.message_id
             })

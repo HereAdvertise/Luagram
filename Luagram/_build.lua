@@ -1,7 +1,7 @@
 local file = assert(io.open("Luagram/init.lua", "r"))
 local content = file:read("*a")
 file:close()
-content = string.gsub(content, "local ([a-zA-Z][a-zA-Z0-9_]*) = require \"Luagram%.(.-)\"", function(modulename, filename)
+content = string.gsub(content, "local ([^ ]+) = require \"Luagram%.(.-)\"", function(modulename, filename)
   print(modulename, filename)
   local modulefile = assert(io.open("Luagram/" .. filename .. ".lua", "r"))
   local modulecontent = modulefile:read("*a")

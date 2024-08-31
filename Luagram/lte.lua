@@ -15,11 +15,21 @@ function lte.new(template, _assert)
     end
     self._template = template
     self._vars = {}
+    self._sandbox = {}
+    self._quote = false
     self._assert = _assert or function(name, value)
       if type(value) == "nil" then error(string.format("value for %q not found", name), 2) end
       return tostring(value)
     end
     return self
+end
+
+function lte:sandbox(sandbox, quote)
+    if sandbox == true then
+
+    end
+
+    
 end
 
 function lte:var(_var, ...)

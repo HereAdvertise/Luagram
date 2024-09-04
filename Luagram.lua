@@ -512,7 +512,7 @@ local function parse_compose(chat, compose, only_content, update_type, update_da
                 end
                 texts[#texts + 1] = "\n"
             elseif item._type == "html" then
-                close_tags()
+                -- close_tags()
                 texts[#texts + 1] = text(chat, item.value)
 
             -- transaction

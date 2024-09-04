@@ -1700,7 +1700,7 @@ local function callback_query(self, chat_id, language_code, update_data)
 
     if action.lock then
         answer.callback_query_id = update_data.id
-        self.__super:answer_callback_query(answer)
+        pcall(self.__super.answer_callback_query, self.__super, answer)
         return true
     end
 
@@ -1849,7 +1849,7 @@ local function callback_query(self, chat_id, language_code, update_data)
                     for _, value in pairs(action.interactions) do
                         user.interactions[value] = nil
                     end
-                    self.__super:delete_message({
+                    pcall(self.__super.delete_message, self.__super, {
                         chat_id = chat_id,
                         message_id = update_data.message.message_id
                     })
@@ -1865,7 +1865,7 @@ local function callback_query(self, chat_id, language_code, update_data)
             for _, value in pairs(action.interactions) do
                 user.interactions[value] = nil
             end
-            self.__super:delete_message({
+            pcall(self.__super.delete_message, self.__super, {
                 chat_id = chat_id,
                 message_id = update_data.message.message_id
             })
@@ -1908,7 +1908,7 @@ local function callback_query(self, chat_id, language_code, update_data)
 
         if action.compose._transaction then
 
-            self.__super:delete_message({
+            pcall(self.__super.delete_message, self.__super, {
                 chat_id = chat_id,
                 message_id = update_data.message.message_id
             })
@@ -1942,7 +1942,7 @@ local function callback_query(self, chat_id, language_code, update_data)
             result._output.message_id = update_data.message.message_id
             ok, message = self.__super:edit_message_caption(result._output)
         elseif (action.compose._method == "message" and result._method ~= "message") or (action.compose._method ~= result._method) then
-            self.__super:delete_message({
+            pcall(self.__super.delete_message, self.__super, {
                 chat_id = chat_id,
                 message_id = update_data.message.message_id
             })
@@ -1984,7 +1984,7 @@ local function callback_query(self, chat_id, language_code, update_data)
         answer.text = table.concat(answer.text)
     end
     answer.callback_query_id = update_data.id
-    self.__super:answer_callback_query(answer)
+    pcall(self.__super.answer_callback_query, self.__super, answer)
 
     return true
 end
@@ -2024,7 +2024,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
     local _ = (function(ok, ...)
 
         if not ok then
-            self.__super:answer_shipping_query({
+            pcall(self.__super.answer_shipping_query, self.__super, {
                 shipping_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
@@ -2036,14 +2036,14 @@ local function shipping_query(self, chat_id, language_code, update_data)
         local result = ...
 
         if type(result) == "string" then
-            self.__super:answer_shipping_query({
+            pcall(self.__super.answer_shipping_query, self.__super, {
                 shipping_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, result)
             })
             return
         elseif result == false then
-            self.__super:answer_shipping_query({
+            pcall(self.__super.answer_shipping_query, self.__super, {
                 shipping_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, {"Sorry, delivery to your desired address is unavailable."})
@@ -2061,7 +2061,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
                         prices = current.prices
                     }
                 else
-                    self.__super:answer_shipping_query({
+                    pcall(self.__super.answer_shipping_query, self.__super, {
                         shipping_query_id = update_data.id,
                         ok = false,
                         error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
@@ -2070,7 +2070,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
                     return
                 end
             end
-            self.__super:answer_shipping_query({
+            pcall(self.__super.answer_shipping_query, self.__super, {
                 shipping_query_id = update_data.id,
                 ok = true,
                 shipping_options = options
@@ -2078,7 +2078,7 @@ local function shipping_query(self, chat_id, language_code, update_data)
             return
         end
         
-        self.__super:answer_shipping_query({
+        pcall(self.__super.answer_shipping_query, self.__super, {
             shipping_query_id = update_data.id,
             ok = false,
             error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
@@ -2126,7 +2126,7 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
     local _ = (function(ok, ...)
 
         if not ok then
-            self.__super:answer_pre_checkout_query({
+            pcall(self.__super.answer_pre_checkout_query, self.__super, {
                 pre_checkout_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
@@ -2138,28 +2138,28 @@ local function pre_checkout_query(self, chat_id, language_code, update_data)
         local result = ...
 
         if type(result) == "string" then
-            self.__super:answer_pre_checkout_query({
+            pcall(self.__super.answer_pre_checkout_query, self.__super, {
                 pre_checkout_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, result)
             })
             return
         elseif result == false then
-            self.__super:answer_pre_checkout_query({
+            pcall(self.__super.answer_pre_checkout_query, self.__super, {
                 pre_checkout_query_id = update_data.id,
                 ok = false,
                 error_message = text(self, {"Sorry, it won't be possible to complete the payment for the item you selected. Please try again in the bot."})
             })
             return
         elseif result == true then
-            self.__super:answer_pre_checkout_query({
+            pcall(self.__super.answer_pre_checkout_query, self.__super, {
                 pre_checkout_query_id = update_data.id,
                 ok = true
             })
             return
         end
         
-        self.__super:answer_pre_checkout_query({
+        pcall(self.__super.answer_pre_checkout_query, self.__super, {
             pre_checkout_query_id = update_data.id,
             ok = false,
             error_message = text(self, {"Unfortunately, there was an issue while proceeding with this payment."})
@@ -2282,7 +2282,7 @@ local function parse_update(self, update)
         local time = string.match(update_data.data, "^Luagram_action_%d+_%d+_(%d+)$")
         if time and (not user or tonumber(time) < user.created_at) then
             if update_data.from and update_data.from.is_bot ~= true and update_data.message and update_data.message.chat.type == "private" then
-                self.__super:answer_callback_query({
+                pcall(self.__super.answer_callback_query, self.__super, {
                     callback_query_id = update_data.id,
                     text = text(self:chat(chat_id, language_code), {"Welcome back! This message is outdated. Let's start over!"})
                 })
@@ -2290,7 +2290,7 @@ local function parse_update(self, update)
                     return self
                 end
             else
-                self.__super:answer_callback_query({
+                pcall(self.__super.answer_callback_query, self.__super, {
                     callback_query_id = update_data.id,
                     text = text(self:chat(chat_id, language_code), {"Welcome back! This message is outdated."})
                 })
@@ -2305,7 +2305,7 @@ local function parse_update(self, update)
         end
 
         if string.match(update_data.invoice_payload, "^Luagram_transaction_%d+_%d+_%d+$") then
-            self.__super:answer_shipping_query({
+            pcall(self.__super.answer_shipping_query, self.__super, {
                 shipping_query_id = update_data.id,
                 ok = false,
                 error_message = text(self:chat(chat_id, language_code), {"Unfortunately, there was an issue while completing this payment."})
@@ -2320,7 +2320,7 @@ local function parse_update(self, update)
         end
 
         if string.match(update_data.invoice_payload, "^Luagram_transaction_%d+_%d+_%d+$") then
-            self.__super:answer_pre_checkout_query({
+            pcall(self.__super.answer_pre_checkout_query, self.__super, {
                 pre_checkout_query_id = update_data.id,
                 ok = false,
                 error_message = text(self:chat(chat_id, language_code), {"Unfortunately, it wasn't possible to complete this payment. Please start the process again in the bot."})

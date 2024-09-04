@@ -373,83 +373,86 @@ local function parse_compose(chat, compose, only_content, update_type, update_da
                 if open_tags.bold then
                     close_tags()
                 end
-                open_tags.bold = true
-                open_tags[#open_tags + 1] = "</b>"
                 texts[#texts + 1] = "<b>"
                 if item.value then
                     texts[#texts + 1] = escape_html(text(chat, item.value))
+                    texts[#texts + 1] = "</b>"
                     if not open_tags.open then
                         close_tags()
                     end
                 else
+                    open_tags.bold = true
+                    open_tags[#open_tags + 1] = "</b>"
                     open_tags.open = true
                 end
             elseif item._type == "italic" then
                 if open_tags.italic then
                     close_tags()
                 end
-                open_tags.italic = true
-                open_tags[#open_tags + 1] = "</i>"
                 texts[#texts + 1] = "<i>"
                 if item.value then
                     texts[#texts + 1] = escape_html(text(chat, item.value))
+                    texts[#texts + 1] = "</i>"
                     if not open_tags.open then
                         close_tags()
                     end
                 else
+                    open_tags.italic = true
+                    open_tags[#open_tags + 1] = "</i>"
                     open_tags.open = true
                 end
             elseif item._type == "underline" then
                 if open_tags.underline then
                     close_tags()
                 end
-                open_tags.underline = true
-                open_tags[#open_tags + 1] = "</u>"
                 texts[#texts + 1] = "<u>"
                 if item.value then
                     texts[#texts + 1] = escape_html(text(chat, item.value))
+                    texts[#texts + 1] = "</u>"
                     if not open_tags.open then
                         close_tags()
                     end
                 else
+                    open_tags.underline = true
+                    open_tags[#open_tags + 1] = "</u>"
                     open_tags.open = true
                 end
             elseif item._type == "spoiler" then
                 if open_tags.spoiler then
                     close_tags()
                 end
-                open_tags.spoiler = true
-                open_tags[#open_tags + 1] = "</tg-spoiler>"
                 texts[#texts + 1] = "<tg-spoiler>"
                 if item.value then
                     texts[#texts + 1] = escape_html(text(chat, item.value))
+                    texts[#texts + 1] = "</tg-spoiler>"
                     if not open_tags.open then
                         close_tags()
                     end
                 else
+                    open_tags.spoiler = true
+                    open_tags[#open_tags + 1] = "</tg-spoiler>"
                     open_tags.open = true
                 end
             elseif item._type == "strike" then
                 if open_tags.strike then
                     close_tags()
                 end
-                open_tags.strike = true
-                open_tags[#open_tags + 1] = "</s>"
                 texts[#texts + 1] = "<s>"
                 if item.value then
                     texts[#texts + 1] = escape_html(text(chat, item.value))
+                    texts[#texts + 1] = "</s>"
                     if not open_tags.open then
                         close_tags()
                     end
                 else
+                    open_tags.strike = true
+                    open_tags[#open_tags + 1] = "</s>"
                     open_tags.open = true
                 end
             elseif item._type == "quote" then
                 if open_tags.quote then
                     close_tags()
                 end
-                open_tags.quote = true
-                open_tags[#open_tags + 1] = "</blockquote>"
                 if item.expandable then
                     texts[#texts + 1] = "<blockquote expandable>"
                 else
@@ -457,10 +460,13 @@ local function parse_compose(chat, compose, only_content, update_type, update_da
                 end
                 if item.value then
                     texts[#texts + 1] = escape_html(text(chat, item.value))
+                    texts[#texts + 1] = "</blockquote>"
                     if not open_tags.open then
                         close_tags()
                     end
                 else
+                    open_tags.quote = true
+                    open_tags[#open_tags + 1] = "</blockquote>"
                     open_tags.open = true
                 end
             elseif item._type == "close" then

@@ -21,7 +21,6 @@ local function stdout(message)
 end
 
 local function stderr(message)
-    Log( kLogError, "    stderr#####################################")
     io.stderr:write("(Luagram) ", os.date("!%Y-%m-%d %H:%M:%S GMT: "), "[Error] ", tostring(message), "\n")
     io.stderr:flush()
 end
@@ -254,16 +253,7 @@ local function text(self, value)
 end
 
 local function catch_error(err)
-    local message = tostring(err)
-    --[[
-    if debug.traceback then
-        local ok, result = pcall(debug.traceback, message)
-        if ok and type(result) == "string" then
-            message = result
-        end
-    end
-    --]]
-    stderr(message)
+    stderr(tostring(err))
 end
 
 local send_object
@@ -344,7 +334,6 @@ local function parse_compose(chat, compose, only_content, update_type, update_da
             end
             local result, args = (function(ok, ...)
                 if not ok then
-                    Log( kLogError, "    compose._catch#####################################")
                     compose._catch((...))
                     return false
                 end
@@ -1303,7 +1292,6 @@ addons.compose = function(self)
 
     compose.catch = function(self, catch)
         self._catch = function(err)
-            Log( kLogError, "     compose.catch#####################################")
             catch(string.format("%s: %s", self._name, err))
         end
         return self

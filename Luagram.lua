@@ -334,8 +334,8 @@ local function parse_compose(chat, compose, only_content, update_type, update_da
             end
             local result, args = (function(ok, ...)
                 if not ok then
-                    compose._catch(...)
-                    return
+                    compose._catch((...))
+                    return false
                 end
                 return ..., list(select(2, ...))
             end)(pcall(item.run, compose, unlist(item.args["#"] > 0 and item.args or select("#", ...) > 0 and list(...) or compose._args)))

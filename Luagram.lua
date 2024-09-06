@@ -253,7 +253,11 @@ local function text(self, value)
 end
 
 local function catch_error(err)
-    stderr(tostring(err))
+    if _G.GetRedbeanVersion then
+        stderr(tostring(err))
+    else
+        stderr(debug.traceback(tostring(err)))
+    end
 end
 
 local send_object

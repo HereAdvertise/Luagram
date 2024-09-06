@@ -255,12 +255,14 @@ end
 
 local function catch_error(err)
     local message = tostring(err)
+    --[[
     if debug.traceback then
         local ok, result = pcall(debug.traceback, message)
         if ok and type(result) == "string" then
             message = result
         end
     end
+    --]]
     stderr(message)
 end
 

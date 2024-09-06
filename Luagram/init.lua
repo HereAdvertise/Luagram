@@ -254,7 +254,7 @@ local function text(self, value)
 end
 
 local function catch_error(err)
-    Log( kLogError, pcall(debug.traceback,tostring(err)))
+    Log( kLogError, "chegou aqui")
     stderr(debug.traceback(tostring(err)))
 end
 

@@ -169,7 +169,7 @@ local function escape_html(text)
 end
 
 local function escape_path(text)
-    return (string.gsub(text, "%W", function(char)
+    return (string.gsub(text, "[^%w%+]", function(char)
         return string.format("%%%02X", string.byte(char))
     end))
 end

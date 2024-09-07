@@ -1301,13 +1301,18 @@ addons.compose = function(self)
         return self
     end
     
-    compose.position = function(self, position)
+    compose.position = function(self, ...)
+        local position = ...
+        local result = self
+        if select("#", ...) == 0 then
+            result = #self
+        end
         if type(position) == "number" and position >= 0 then
             self._position = position
         else
             self._position = false
         end
-        return self
+        return result
     end
 
     return self

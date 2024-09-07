@@ -1306,11 +1306,12 @@ addons.compose = function(self)
         local result = self
         if select("#", ...) == 0 then
             result = #self
-        end
-        if type(position) == "number" and position >= 0 then
-            self._position = position
         else
-            self._position = false
+            if type(position) == "number" and position >= 0 then
+                self._position = position
+            else
+                self._position = false
+            end
         end
         return result
     end

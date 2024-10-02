@@ -1938,7 +1938,7 @@ local function callback_query(self, chat_id, language_code, update_data)
         elseif response == false then
             this:remove({keyboard = true})
         elseif type(response) == "string" then
-            local object = self.__super._objects[response]
+            local object = self.__super._objects[string.lower(response)]
             if object then
                 if object._type == "compose" then
                     this = self.compose.clone(object)

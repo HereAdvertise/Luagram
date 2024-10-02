@@ -2490,7 +2490,7 @@ local function parse_update(self, update)
     if update_type == "message" and update_data.text then
         local text = update_data.text
         local command, space, payload = string.match(text, "^(/[a-zA-Z0-9_]+)(.?)(.*)$")
-        if command and self.__super._objects[command] then
+        if command and self.__super._objects[string.lower(command)] then
             user.thread = nil
             if space == " " and payload ~= "" then
                 if send_object(self, chat_id, language_code, update_type, update_data, command, payload) == true then

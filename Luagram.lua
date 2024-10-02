@@ -855,7 +855,17 @@ send_object = function(self, chat_id, language_code, update_type, update_data, n
 
     local object
 
+    local chat = self.__super:chat(chat_id, language_code)
+
     if type(name) == "string" then
+        name = string.lower(name)
+        object = objects[name]
+        if not object then
+            error(string.format("object not found: %s", name))
+        end
+    elseif type(name) == "table" and not name._type then
+        name = text(chat, name)
+        name = string.lower(name)
         object = objects[name]
         if not object then
             error(string.format("object not found: %s", name))
@@ -868,8 +878,6 @@ send_object = function(self, chat_id, language_code, update_type, update_data, n
     else
         error("invalid object")
     end
-
-    local chat = self.__super:chat(chat_id, language_code)
 
     if object._type == "compose" then
 
@@ -1010,8 +1018,9 @@ addons.compose = function(self)
         elseif not name then
             self._name = tostring(self._id)
         else
+            name = string.lower(name)
             self._name = name
-            self.__super._objects[self._name] = self
+            self.__super._objects[name] = self
         end
         self._dispatch = {}
         self._predispatch = {}
@@ -1334,8 +1343,9 @@ addons.session = function(self)
         elseif not name then
             self._name = tostring(self._id)
         else
+            name = string.lower(name)
             self._name = name
-            self.__super._objects[self._name] = self
+            self.__super._objects[name] = self
         end
         self._args = list(...)
         self:catch(catch_error)

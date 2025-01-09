@@ -39,7 +39,7 @@ end
 
 local function assert_level(level, ...)
     if not select(1, ...) then
-        return error(setmetatable({select(2, ...)}, {__tostring = function(self) return self[1] or "assertion failed!" end}), level)
+        return error(select(2, ...) or "assertion failed!", level)
     end
     return ...
 end
@@ -1733,6 +1733,10 @@ function Luagram:__index(key)
         end
     end
     return value
+end
+
+function Luagram:api(key, data, multipart)
+    return telegram(self, key, data, multipart)
 end
 
 function Luagram:addon(name, ...)

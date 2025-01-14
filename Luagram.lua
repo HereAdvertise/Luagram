@@ -1735,8 +1735,8 @@ function Luagram:__index(key)
     return value
 end
 
-function Luagram:api(key, data, multipart)
-    return telegram(self, key, data, multipart)
+function Luagram:api(key, data, multipart, tries)
+    return telegram(self, key, data, multipart, tries == false and -1 or tries)
 end
 
 function Luagram:addon(name, ...)

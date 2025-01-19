@@ -1412,6 +1412,13 @@ addons.chat = function(self)
         return self
     end
 
+    chat.api = function(self, key, data, multipart, tries)
+        if type(data) == "table" and data.chat_id == nil then
+            data.chat_id = self._chat_id
+        end
+        return telegram(self, key, data, multipart, not tries and -1 or tries)
+    end
+
     chat.say = function(self, ...)
         local texts = {}
         for index = 1, select("#", ...) do

@@ -1277,7 +1277,7 @@ addons.compose = function(self)
     end
 
     compose.content = function(self, ...)
-        return parse_compose(nil, self:clone(), true, nil, nil, unlist(select("#", ...) > 0 and list(...) or list()))
+        return parse_compose(self.__super:chat(), self:clone(), true, nil, nil, unlist(select("#", ...) > 0 and list(...) or list()))
     end
 
     compose.send = function(self, chat_id, language_code, ...)

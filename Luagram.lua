@@ -1934,7 +1934,9 @@ local function callback_query(self, chat_id, language_code, update_data)
     
     this:remove({runtime = true})
 
-    local _ = (function(success, response, ...)
+    local _ = (function(success, ...)
+
+        local response = ...
 
         if not success then
             action.compose._catch(response)
@@ -1981,6 +1983,16 @@ local function callback_query(self, chat_id, language_code, update_data)
             return
         elseif type(response) == "table" and response._type == "compose" then
             this = response
+
+        elseif select("#", ...) > 0 and response == nil then
+            for _, value in pairs(action.interactions) do
+                user.interactions[value] = nil
+            end
+            pcall(self.__super.delete_message, self.__super, {
+                chat_id = chat_id,
+                message_id = update_data.message.message_id
+            })
+            return
         elseif response == nil then
             return
         else

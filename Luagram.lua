@@ -1963,7 +1963,7 @@ local function callback_query(self, chat_id, language_code, update_data)
                         chat_id = chat_id,
                         message_id = update_data.message.message_id
                     })
-                    send_object(self, chat_id, language_code, "callback_query", update_data, object._name, unlist(select("#", ...) > 0 and list(...) or action.args))
+                    send_object(self, chat_id, language_code, "callback_query", update_data, object._name, unlist(select("#", ...) > 1 and list(select(2, ...)) or action.args))
                     return
                 else
                    error(string.format("invalid object: %s", object._type))
@@ -1979,7 +1979,7 @@ local function callback_query(self, chat_id, language_code, update_data)
                 chat_id = chat_id,
                 message_id = update_data.message.message_id
             })
-            send_object(self, chat_id, language_code, "callback_query", update_data, response, unlist(select("#", ...) > 0 and list(...) or action.args))
+            send_object(self, chat_id, language_code, "callback_query", update_data, response, unlist(select("#", ...) > 1 and list(select(2, ...)) or action.args))
             return
         elseif type(response) == "table" and response._type == "compose" then
             this = response
@@ -2012,7 +2012,7 @@ local function callback_query(self, chat_id, language_code, update_data)
             end
         end
 
-        local result, err = parse_compose(chat, this:clone(), false, "callback_query", update_data, unlist(select("#", ...) > 0 and list(...) or args or list()))
+        local result, err = parse_compose(chat, this:clone(), false, "callback_query", update_data, unlist(select("#", ...) > 1 and list(select(2, ...)) or args or list()))
         if result == nil then
             action.compose._catch(string.format("parser error: %s", err))
         end

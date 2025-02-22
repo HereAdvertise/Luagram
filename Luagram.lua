@@ -2333,9 +2333,9 @@ local function chat_id(update_data, update_type)
     if update_type == "callback_query" then
         return update_data.message.chat.id, language, update_data.message.chat.type
     elseif update_type == "pre_checkout_query" or update_type == "shipping_query" then
-        return update_data.from.id, language, update_data.chat.type
+        return update_data.from.id, language, (update_data.chat and update_data.chat.type)
     end
-    return assert(update_data.chat.id, "chat_id not found"), language, update_data.chat.type
+    return assert(update_data.chat.id, "chat_id not found"), language, (update_data.chat and update_data.chat.type)
 end
 
 local function parse_update(self, update)
